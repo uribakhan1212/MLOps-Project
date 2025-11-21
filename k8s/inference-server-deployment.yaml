@@ -1,0 +1,74 @@
+# k8s/inference-server-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: diabetes-inference-server
+  namespace: mlops-fl
+  labels:
+    app: diabetes-inference-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: diabetes-inference-server
+  template:
+    metadata:
+      labels:
+        app: diabetes-inference-server
+    spec:
+      containers:
+      - name: inference-server
+        image: diabetes-inference-server:v1.0
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5003
+          name: http
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+        - name: MODEL_PATH
+          value: "/app/models/tff_federated_diabetes_model.h5"
+        - name: PORT
+          value: "5003"
+      # Note: Model is included in Docker image at /app/models/
+      # If you need to update models dynamically, uncomment the PVC mount below
+      # volumeMounts:
+      # - name: model-storage
+      #   mountPath: /models
+      # volumes:
+      # - name: model-storage
+      #   persistentVolumeClaim:
+      #     claimName: model-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: diabetes-inference-service
+  namespace: mlops-fl
+spec:
+  type: LoadBalancer
+  selector:
+    app: diabetes-inference-server
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5003

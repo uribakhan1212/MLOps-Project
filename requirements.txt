@@ -1,0 +1,9 @@
+# requirements.txt for wsl2 to run federated training
+tensorflow[and-cuda]==2.14.1
+tensorflow-federated==0.78.0
+pandas
+numpy
+flask==3.0.0
+prometheus-flask-exporter==0.23.0
+mlflow==2.9.2
+gunicorn==21.2.0

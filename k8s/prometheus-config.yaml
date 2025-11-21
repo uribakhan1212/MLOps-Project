@@ -1,0 +1,120 @@
+# Prometheus Helm Chart Values
+
+alertmanager:
+  enabled: true
+  
+nodeExporter:
+  enabled: false  # Disable to avoid crashes
+
+pushgateway:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+server:
+  enabled: true
+  
+  persistentVolume:
+    enabled: false  # Disable for development
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  global:
+    scrape_interval: 15s
+    evaluation_interval: 15s
+    scrape_timeout: 10s
+
+# Server configuration files
+serverFiles:
+  prometheus.yml:
+    scrape_configs:
+      # Scrape Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      
+      # Direct scrape of inference service
+      - job_name: 'diabetes-inference-direct'
+        static_configs:
+          - targets: ['diabetes-inference-service.mlops-fl.svc.cluster.local:80']
+        metrics_path: '/metrics'
+        scrape_interval: 15s
+      
+      # Kubernetes pod discovery with annotations
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - mlops-fl
+        
+        relabel_configs:
+          # Only scrape pods with prometheus.io/scrape=true annotation
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          
+          # Use custom metrics path if specified
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          
+          # Use custom port if specified, otherwise use container port
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          
+          # Map pod labels to Prometheus labels
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          
+          # Add namespace label
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          
+          # Add pod name label
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+      
+      # Alternative: Scrape by service discovery with label selector
+      - job_name: 'diabetes-inference-server-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - mlops-fl
+            selectors:
+              - role: pod
+                label: app=diabetes-inference-server
+        
+        relabel_configs:
+          # Keep only pods with app=diabetes-inference-server label
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: diabetes-inference-server
+          
+          # Set the address to pod_ip:5003
+          - source_labels: [__meta_kubernetes_pod_ip]
+            action: replace
+            target_label: __address__
+            replacement: $1:5003
+          
+          # Add pod name
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod_name
+          
+          # Add namespace
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
