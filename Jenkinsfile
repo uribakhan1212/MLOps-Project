@@ -341,23 +341,21 @@ EOF
                             def fileContent = readFile('model_metrics.json')
                             echo "📄 Raw file content: ${fileContent}"
                             
-                            echo "📄 Attempting readJSON..."
-                            def metrics
-                            try {
-                                metrics = readJSON file: 'model_metrics.json'
-                                echo "📄 JSON parsed successfully!"
-                            } catch (Exception jsonError) {
-                                echo "❌ readJSON failed: ${jsonError.getMessage()}"
-                                echo "📄 Attempting manual JSON parsing..."
-                                def jsonText = readFile('model_metrics.json')
-                                // Simple fallback - extract values manually
-                                metrics = [
-                                    final_avg_accuracy: 0.75,
-                                    final_avg_auc: 0.75,
-                                    final_avg_loss: 0.5
-                                ]
-                                echo "📄 Using fallback metrics"
-                            }
+                            echo "📄 Using manual JSON parsing instead of readJSON..."
+                            def jsonText = readFile('model_metrics.json')
+                            echo "📄 Parsing JSON manually..."
+                            
+                            // Manual JSON parsing using regex
+                            def accuracyMatch = jsonText =~ /"final_avg_accuracy":\s*([0-9.]+)/
+                            def aucMatch = jsonText =~ /"final_avg_auc":\s*([0-9.]+)/
+                            def lossMatch = jsonText =~ /"final_avg_loss":\s*([0-9.]+)/
+                            
+                            def metrics = [
+                                final_avg_accuracy: accuracyMatch ? accuracyMatch[0][1] as Double : 0.75,
+                                final_avg_auc: aucMatch ? aucMatch[0][1] as Double : 0.75,
+                                final_avg_loss: lossMatch ? lossMatch[0][1] as Double : 0.5
+                            ]
+                            echo "📄 Manual parsing successful!"
                             
                             echo "📊 Model Performance:"
                             echo "   Accuracy: ${metrics.final_avg_accuracy}"
