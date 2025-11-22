@@ -342,20 +342,49 @@ EOF
                             echo "   AUC: ${metrics.final_avg_auc}"
                             echo "   Loss: ${metrics.final_avg_loss}"
                             
-                            // Validation gates
-                            if (metrics.final_avg_accuracy < env.MIN_ACCURACY.toFloat()) {
-                                error("❌ Model accuracy ${metrics.final_avg_accuracy} is below threshold ${env.MIN_ACCURACY}")
+                            // Validation gates with detailed logging
+                            def minAccuracy = env.MIN_ACCURACY as Double
+                            def minAuc = env.MIN_AUC as Double
+                            def maxLoss = env.MAX_LOSS as Double
+                            
+                            echo "🔍 Validation Thresholds:"
+                            echo "   MIN_ACCURACY: ${minAccuracy}"
+                            echo "   MIN_AUC: ${minAuc}"
+                            echo "   MAX_LOSS: ${maxLoss}"
+                            
+                            def validationErrors = []
+                            
+                            if (metrics.final_avg_accuracy < minAccuracy) {
+                                def errorMsg = "Model accuracy ${metrics.final_avg_accuracy} is below threshold ${minAccuracy}"
+                                echo "❌ ${errorMsg}"
+                                validationErrors.add(errorMsg)
+                            } else {
+                                echo "✅ Accuracy check passed: ${metrics.final_avg_accuracy} >= ${minAccuracy}"
                             }
                             
-                            if (metrics.final_avg_auc < env.MIN_AUC.toFloat()) {
-                                error("❌ Model AUC ${metrics.final_avg_auc} is below threshold ${env.MIN_AUC}")
+                            if (metrics.final_avg_auc < minAuc) {
+                                def errorMsg = "Model AUC ${metrics.final_avg_auc} is below threshold ${minAuc}"
+                                echo "❌ ${errorMsg}"
+                                validationErrors.add(errorMsg)
+                            } else {
+                                echo "✅ AUC check passed: ${metrics.final_avg_auc} >= ${minAuc}"
                             }
                             
-                            if (metrics.final_avg_loss > env.MAX_LOSS.toFloat()) {
-                                error("❌ Model loss ${metrics.final_avg_loss} is above threshold ${env.MAX_LOSS}")
+                            if (metrics.final_avg_loss > maxLoss) {
+                                def errorMsg = "Model loss ${metrics.final_avg_loss} is above threshold ${maxLoss}"
+                                echo "❌ ${errorMsg}"
+                                validationErrors.add(errorMsg)
+                            } else {
+                                echo "✅ Loss check passed: ${metrics.final_avg_loss} <= ${maxLoss}"
                             }
                             
-                            echo "✅ Model passed all validation gates!"
+                            if (validationErrors.size() > 0) {
+                                echo "❌ Model validation failed with ${validationErrors.size()} errors:"
+                                validationErrors.each { echo "   - ${it}" }
+                                error("Model validation failed")
+                            } else {
+                                echo "✅ Model passed all validation gates!"
+                            }
                         } else {
                             echo "⚠️  Warning: model_metrics.json not found, using fallback validation"
                             echo "✅ Continuing pipeline with default validation"
