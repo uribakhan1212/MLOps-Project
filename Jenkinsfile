@@ -14,7 +14,7 @@ spec:
     image: uribakhan/jenkins-agent-python:latest
     env:
     - name: DOCKER_HOST
-      value: tcp://localhost:2376
+      value: tcp://127.0.0.1:2375
     - name: DOCKER_TLS_CERTDIR
       value: ""
     volumeMounts:
@@ -29,11 +29,24 @@ spec:
       value: ""
     - name: DOCKER_DRIVER
       value: overlay2
+    - name: DOCKER_HOST
+      value: tcp://0.0.0.0:2375
+    args:
+    - --host=tcp://0.0.0.0:2375
+    - --host=unix:///var/run/docker.sock
+    - --tls=false
     volumeMounts:
     - name: workspace-volume
       mountPath: /home/jenkins/agent
     - name: docker-storage
       mountPath: /var/lib/docker
+    readinessProbe:
+      exec:
+        command:
+        - docker
+        - info
+      initialDelaySeconds: 10
+      periodSeconds: 5
   volumes:
   - name: workspace-volume
     emptyDir: {}
@@ -468,6 +481,20 @@ EOF
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
+                    # Wait for Docker daemon to be ready
+                    echo "⏳ Waiting for Docker daemon to be ready..."
+                    for i in {1..30}; do
+                        if docker info >/dev/null 2>&1; then
+                            echo "✅ Docker daemon is ready!"
+                            break
+                        fi
+                        echo "⏳ Waiting for Docker daemon... (attempt $i/30)"
+                        sleep 2
+                    done
+                    
+                    # Verify Docker is working
+                    docker info
+                    
                     # Build Docker image
                     docker build -f docker/inference_server/Dockerfile -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
                     
