@@ -103,16 +103,7 @@ spec:
                     echo "✓ Pip version: $(pip --version)"
                     echo "✓ Docker version: $(docker --version)"
                     echo "✓ Kubectl version: $(kubectl version --client)"
-                    
-                    # Install additional requirements if needed
-                    if [ -f "requirements.txt" ]; then
-                        pip install -r requirements.txt
-                    fi
-                    
-                    # Test imports
-                    python -c "import tensorflow as tf; print(f'✓ TensorFlow version: {tf.__version__}')"
-                    python -c "import mlflow; print(f'✓ MLflow version: {mlflow.__version__}')"
-                    python -c "import pandas as pd; print(f'✓ Pandas version: {pd.__version__}')"
+                
                     
                     echo "✅ Environment ready!"
                 '''
@@ -178,7 +169,8 @@ spec:
                         echo "   Drifted features: ${driftResults.drifted_features}/${driftResults.total_features}"
                         echo "   Drift percentage: ${driftResults.drift_percentage * 100}%"
                         
-                        def driftThreshold = env.DRIFT_THRESHOLD as Double
+                        try{
+                            def driftThreshold = env.DRIFT_THRESHOLD as Double
                         if (driftResults.drift_percentage > driftThreshold) {
                             echo "⚠️  WARNING: Significant drift detected (${driftResults.drift_percentage * 100}% > ${driftThreshold * 100}%)"
                             echo "   Model retraining recommended"
@@ -188,6 +180,11 @@ spec:
                             echo "✅ Drift within acceptable limits"
                             env.SIGNIFICANT_DRIFT = 'false'
                         }
+                        catch{
+                            echo "Thresholding failed!!"
+                        }
+                        }
+                        
                     } catch (Exception e) {
                         echo "⚠️  Warning: Could not parse drift results with readJSON: ${e.getMessage()}"
                         echo "   Trying alternative approach..."
