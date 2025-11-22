@@ -146,9 +146,9 @@ def main():
     metrics = None
     
     # Try MLflow first (unless forced to use fallback)
-    if not args.force_fallback:
-        print("📡 Attempting to load from MLflow...")
-        metrics = load_from_mlflow(args.mlflow_uri, args.experiment_name)
+    # if not args.force_fallback:
+    #     print("📡 Attempting to load from MLflow...")
+    #     metrics = load_from_mlflow(args.mlflow_uri, args.experiment_name)
     
     # Try fallback if MLflow failed or was skipped
     if not metrics:
