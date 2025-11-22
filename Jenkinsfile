@@ -2,7 +2,12 @@
 // Handles: Training → Validation → Docker → Deployment → Monitoring → Drift Detection
 
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'python:3.10-slim'
+            args '-v /var/run/docker.sock:/var/run/docker.sock -u root'
+        }
+    }
     
     environment {
         // Docker Configuration
@@ -80,71 +85,37 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Check available Python versions
-                    echo "Checking available Python installations..."
-                    which python3 || which python || echo "No python3/python found"
+                    # Install system dependencies
+                    apt-get update && apt-get install -y git curl wget apt-transport-https ca-certificates gnupg lsb-release
                     
-                    # Try different Python commands
-                    if command -v python3 >/dev/null 2>&1; then
-                        PYTHON_CMD="python3"
-                    elif command -v python >/dev/null 2>&1; then
-                        PYTHON_CMD="python"
-                    else
-                        echo "❌ No Python installation found"
-                        echo "Available commands:"
-                        ls -la /usr/bin/python* || echo "No python binaries in /usr/bin"
-                        
-                        # Try to install Python if we're on a system that supports it
-                        if command -v apt-get >/dev/null 2>&1; then
-                            echo "Installing Python3..."
-                            apt-get update && apt-get install -y python3 python3-pip python3-venv
-                            PYTHON_CMD="python3"
-                        elif command -v yum >/dev/null 2>&1; then
-                            echo "Installing Python3..."
-                            yum install -y python3 python3-pip
-                            PYTHON_CMD="python3"
-                        else
-                            echo "❌ Cannot install Python automatically"
-                            exit 1
-                        fi
-                    fi
+                    # Install Docker CLI
+                    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+                    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+                    apt-get update && apt-get install -y docker-ce-cli
                     
-                    echo "✓ Using Python command: $PYTHON_CMD"
-                    $PYTHON_CMD --version
-                    
-                    # Create virtual environment
-                    $PYTHON_CMD -m venv venv || {
-                        echo "Virtual environment creation failed, trying without venv..."
-                        # If venv fails, try using system Python with user install
-                        export PIP_USER=1
-                        export PATH=$HOME/.local/bin:$PATH
-                    }
-                    
-                    # Activate virtual environment if it exists
-                    if [ -d "venv" ]; then
-                        . venv/bin/activate
-                        echo "✓ Virtual environment activated"
-                    else
-                        echo "⚠️ Using system Python with user install"
-                    fi
-                    
-                    # Upgrade pip
-                    python -m pip install --upgrade pip --user || pip install --upgrade pip
-                    
-                    # Install requirements
-                    if [ -f "requirements.txt" ]; then
-                        pip install -r requirements.txt --user || python -m pip install -r requirements.txt --user
-                    else
-                        echo "⚠️ requirements.txt not found, installing basic packages..."
-                        pip install tensorflow pandas numpy scikit-learn mlflow --user || python -m pip install tensorflow pandas numpy scikit-learn mlflow --user
-                    fi
+                    # Install kubectl for Kubernetes operations
+                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                    chmod +x kubectl
+                    mv kubectl /usr/local/bin/
                     
                     echo "✓ Python version: $(python --version)"
                     echo "✓ Pip version: $(pip --version)"
                     
-                    # Test imports (with error handling)
+                    # Upgrade pip
+                    python -m pip install --upgrade pip
+                    
+                    # Install requirements
+                    if [ -f "requirements.txt" ]; then
+                        pip install -r requirements.txt
+                    else
+                        echo "⚠️ requirements.txt not found, installing basic packages..."
+                        pip install tensorflow pandas numpy scikit-learn mlflow requests evidently
+                    fi
+                    
+                    # Test imports
                     python -c "import tensorflow as tf; print(f'✓ TensorFlow version: {tf.__version__}')" || echo "⚠️ TensorFlow not available"
                     python -c "import mlflow; print(f'✓ MLflow version: {mlflow.__version__}')" || echo "⚠️ MLflow not available"
+                    python -c "import pandas as pd; print(f'✓ Pandas version: {pd.__version__}')" || echo "⚠️ Pandas not available"
                 '''
             }
         }
@@ -177,14 +148,6 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Activate Python environment
-                    if [ -d "venv" ]; then
-                        . venv/bin/activate
-                    else
-                        export PIP_USER=1
-                        export PATH=$HOME/.local/bin:$PATH
-                    fi
-                    
                     python scripts/validate_data.py
                 '''
             }
@@ -200,16 +163,8 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Activate Python environment
-                    if [ -d "venv" ]; then
-                        . venv/bin/activate
-                    else
-                        export PIP_USER=1
-                        export PATH=$HOME/.local/bin:$PATH
-                    fi
-                    
-                    # Install evidently for drift detection
-                    pip install evidently --user || python -m pip install evidently --user
+                    # Install evidently for drift detection (if not already installed)
+                    pip install evidently
                     
                     mkdir -p reports
                     python scripts/detect_drift.py
@@ -245,16 +200,8 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Activate Python environment
-                    if [ -d "venv" ]; then
-                        . venv/bin/activate
-                    else
-                        export PIP_USER=1
-                        export PATH=$HOME/.local/bin:$PATH
-                    fi
-                    
                     # Install pytest
-                    pip install pytest pytest-cov --user || python -m pip install pytest pytest-cov --user
+                    pip install pytest pytest-cov
                     
                     # Create test directories
                     mkdir -p tests/unit test-results
@@ -298,14 +245,6 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Activate Python environment
-                    if [ -d "venv" ]; then
-                        . venv/bin/activate
-                    else
-                        export PIP_USER=1
-                        export PATH=$HOME/.local/bin:$PATH
-                    fi
-                    
                     # Set MLflow tracking URI
                     export MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
                     
@@ -332,14 +271,6 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Activate Python environment
-                    if [ -d "venv" ]; then
-                        . venv/bin/activate
-                    else
-                        export PIP_USER=1
-                        export PATH=$HOME/.local/bin:$PATH
-                    fi
-                    
                     export MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
                     
                     # Use enhanced validation script with fallback support
@@ -382,14 +313,6 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Activate Python environment
-                    if [ -d "venv" ]; then
-                        . venv/bin/activate
-                    else
-                        export PIP_USER=1
-                        export PATH=$HOME/.local/bin:$PATH
-                    fi
-                    
                     export MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
                     
                     # Use enhanced download script with fallback support
@@ -562,14 +485,6 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Activate Python environment
-                    if [ -d "venv" ]; then
-                        . venv/bin/activate
-                    else
-                        export PIP_USER=1
-                        export PATH=$HOME/.local/bin:$PATH
-                    fi
-                    
                     # Create test directories
                     mkdir -p tests/integration
                     
@@ -590,16 +505,8 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Activate Python environment
-                    if [ -d "venv" ]; then
-                        . venv/bin/activate
-                    else
-                        export PIP_USER=1
-                        export PATH=$HOME/.local/bin:$PATH
-                    fi
-                    
                     # Install locust for load testing
-                    pip install locust --user || python -m pip install locust --user
+                    pip install locust
                     
                     # Create or run load tests
                     if [ ! -f "tests/load_test.py" ]; then
