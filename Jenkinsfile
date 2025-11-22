@@ -180,9 +180,10 @@ spec:
                             echo "✅ Drift within acceptable limits"
                             env.SIGNIFICANT_DRIFT = 'false'
                         }
+                        
+                        }
                         catch{
                             echo "Thresholding failed!!"
-                        }
                         }
                         
                     } catch (Exception e) {
