@@ -12,13 +12,33 @@ spec:
   containers:
   - name: jnlp
     image: uribakhan/jenkins-agent-python:latest
+    env:
+    - name: DOCKER_HOST
+      value: tcp://localhost:2376
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
     volumeMounts:
-    - name: docker-sock
-      mountPath: /var/run/docker.sock
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
+  - name: docker
+    image: docker:27-dind
+    securityContext:
+      privileged: true
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+    - name: DOCKER_DRIVER
+      value: overlay2
+    volumeMounts:
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
+    - name: docker-storage
+      mountPath: /var/lib/docker
   volumes:
-  - name: docker-sock
-    hostPath:
-      path: /var/run/docker.sock
+  - name: workspace-volume
+    emptyDir: {}
+  - name: docker-storage
+    emptyDir: {}
 """
         }
     }
