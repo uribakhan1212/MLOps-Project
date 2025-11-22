@@ -1,9 +1,28 @@
-# requirements.txt for wsl2 to run federated training
-tensorflow[and-cuda]==2.14.1
-tensorflow-federated==0.78.0
-pandas
-numpy
-flask==3.0.0
-prometheus-flask-exporter==0.23.0
-mlflow==2.9.2
-gunicorn==21.2.0
+# requirements.txt for MLOps federated training pipeline
+# Updated with compatible versions
+
+# Core ML packages
+tensorflow>=2.15.0,<2.21.0
+tensorflow-federated>=0.78.0
+pandas>=1.5.0
+numpy>=1.21.0
+scikit-learn>=1.0.0
+
+# MLflow and tracking
+mlflow>=2.9.0
+
+# Web framework and monitoring
+flask>=3.0.0
+prometheus-flask-exporter>=0.23.0
+gunicorn>=21.2.0
+
+# Additional packages for pipeline
+requests>=2.28.0
+evidently>=0.4.0
+
+# Testing packages
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Load testing
+locust>=2.0.0

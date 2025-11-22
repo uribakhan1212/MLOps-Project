@@ -33,16 +33,19 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --upgrade pip \
     && /opt/venv/bin/pip install \
-        tensorflow \
-        pandas \
-        numpy \
-        scikit-learn \
-        mlflow \
-        requests \
-        evidently \
-        pytest \
-        pytest-cov \
-        locust
+        "tensorflow>=2.15.0,<2.21.0" \
+        "pandas>=1.5.0" \
+        "numpy>=1.21.0" \
+        "scikit-learn>=1.0.0" \
+        "mlflow>=2.9.0" \
+        "requests>=2.28.0" \
+        "evidently>=0.4.0" \
+        "pytest>=7.0.0" \
+        "pytest-cov>=4.0.0" \
+        "locust>=2.0.0" \
+        flask \
+        prometheus-flask-exporter \
+        gunicorn
 
 # Add virtual environment to PATH
 ENV PATH="/opt/venv/bin:$PATH"
