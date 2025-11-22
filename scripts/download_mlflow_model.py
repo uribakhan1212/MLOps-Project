@@ -124,9 +124,9 @@ def main():
     model_path = None
     
     # Try MLflow first (unless forced to use fallback)
-    if not args.force_fallback:
-        print("📡 Attempting to download from MLflow...")
-        model_path = download_from_mlflow(args.mlflow_uri, args.model_name, args.output_dir)
+    # if not args.force_fallback:
+    #     print("📡 Attempting to download from MLflow...")
+    #     model_path = download_from_mlflow(args.mlflow_uri, args.model_name, args.output_dir)
     
     # Try fallback if MLflow failed or was skipped
     if not model_path:
