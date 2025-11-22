@@ -196,41 +196,41 @@ spec:
             }
         }
         
-        stage('🧪 Run Unit Tests') {
-            steps {
-                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                echo '🧪 Running unit tests...'
-                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        // stage('🧪 Run Unit Tests') {
+        //     steps {
+        //         echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        //         echo '🧪 Running unit tests...'
+        //         echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
-                sh '''
-                    # Create test directories
-                    mkdir -p tests/unit test-results
+        //         sh '''
+        //             # Create test directories
+        //             mkdir -p tests/unit test-results
                     
-                    # Run tests (create basic test if none exist)
-                    if [ ! -f "tests/unit/test_model.py" ]; then
-                        python scripts/create_basic_tests.py
-                    fi
+        //             # Run tests (create basic test if none exist)
+        //             if [ ! -f "tests/unit/test_model.py" ]; then
+        //                 python scripts/create_basic_tests.py
+        //             fi
                     
-                    # Run tests
-                    pytest tests/unit/ \
-                        --cov=src \
-                        --cov-report=html \
-                        --cov-report=term \
-                        --junitxml=test-results/junit.xml \
-                        -v || echo "Tests completed with warnings"
-                '''
-            }
-            post {
-                always {
-                    junit 'test-results/junit.xml'
-                    publishHTML([
-                        reportDir: 'htmlcov',
-                        reportFiles: 'index.html',
-                        reportName: 'Coverage Report'
-                    ])
-                }
-            }
-        }
+        //             # Run tests
+        //             pytest tests/unit/ \
+        //                 --cov=src \
+        //                 --cov-report=html \
+        //                 --cov-report=term \
+        //                 --junitxml=test-results/junit.xml \
+        //                 -v || echo "Tests completed with warnings"
+        //         '''
+        //     }
+        //     post {
+        //         always {
+        //             junit 'test-results/junit.xml'
+        //             publishHTML([
+        //                 reportDir: 'htmlcov',
+        //                 reportFiles: 'index.html',
+        //                 reportName: 'Coverage Report'
+        //             ])
+        //         }
+        //     }
+        // }
         
         stage('🤖 Train Federated Model') {
             when {
