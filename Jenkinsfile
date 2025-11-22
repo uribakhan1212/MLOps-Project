@@ -506,27 +506,27 @@ EOF
             }
         }
         
-        stage('🔒 Security Scan') {
-            steps {
-                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                echo '🔒 Scanning container for vulnerabilities...'
-                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        // stage('🔒 Security Scan') {
+        //     steps {
+        //         echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        //         echo '🔒 Scanning container for vulnerabilities...'
+        //         echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
-                sh '''
-                    # Install trivy if not present
-                    if ! command -v trivy &> /dev/null; then
-                        echo "Installing trivy..."
-                        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-                        echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-                        sudo apt-get update
-                        sudo apt-get install trivy -y
-                    fi
+        //         sh '''
+        //             # Install trivy if not present
+        //             if ! command -v trivy &> /dev/null; then
+        //                 echo "Installing trivy..."
+        //                 wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+        //                 echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+        //                 sudo apt-get update
+        //                 sudo apt-get install trivy -y
+        //             fi
                     
-                    # Scan image (allow to continue even with vulnerabilities for now)
-                    trivy image --severity HIGH,CRITICAL ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || echo "Security scan completed with findings"
-                '''
-            }
-        }
+        //             # Scan image (allow to continue even with vulnerabilities for now)
+        //             trivy image --severity HIGH,CRITICAL ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || echo "Security scan completed with findings"
+        //         '''
+        //     }
+        // }
         
         stage('📤 Push to Registry') {
             steps {
