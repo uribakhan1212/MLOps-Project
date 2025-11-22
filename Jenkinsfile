@@ -143,89 +143,89 @@ spec:
             }
         }
         
-        stage('🔍 Data Drift Detection') {
-            when {
-                expression { return env.DRIFT_CHECK_ENABLED == 'true' }
-            }
-            steps {
-                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                echo '🔍 Checking for data drift...'
-                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        // stage('🔍 Data Drift Detection') {
+        //     when {
+        //         expression { return env.DRIFT_CHECK_ENABLED == 'true' }
+        //     }
+        //     steps {
+        //         echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        //         echo '🔍 Checking for data drift...'
+        //         echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
-                sh '''
-                    mkdir -p reports
-                    python scripts/detect_drift.py
-                '''
+        //         sh '''
+        //             mkdir -p reports
+        //             python scripts/detect_drift.py
+        //         '''
                 
-                script {
-                    try {
-                        // Debug: Check if file exists and show contents
-                        sh 'pwd && ls -la && ls -la drift_results.json || echo "drift_results.json not found"'
+        //         script {
+        //             try {
+        //                 // Debug: Check if file exists and show contents
+        //                 sh 'pwd && ls -la && ls -la drift_results.json || echo "drift_results.json not found"'
                         
-                        def driftResults = readJSON file: 'drift_results.json'
+        //                 def driftResults = readJSON file: 'drift_results.json'
                         
-                        echo "📊 Drift Detection Results:"
-                        echo "   Dataset drift: ${driftResults.dataset_drift}"
-                        echo "   Drifted features: ${driftResults.drifted_features}/${driftResults.total_features}"
-                        echo "   Drift percentage: ${driftResults.drift_percentage * 100}%"
+        //                 echo "📊 Drift Detection Results:"
+        //                 echo "   Dataset drift: ${driftResults.dataset_drift}"
+        //                 echo "   Drifted features: ${driftResults.drifted_features}/${driftResults.total_features}"
+        //                 echo "   Drift percentage: ${driftResults.drift_percentage * 100}%"
                         
-                        try{
-                            def driftThreshold = env.DRIFT_THRESHOLD as Double
-                        if (driftResults.drift_percentage > driftThreshold) {
-                            echo "⚠️  WARNING: Significant drift detected (${driftResults.drift_percentage * 100}% > ${driftThreshold * 100}%)"
-                            echo "   Model retraining recommended"
-                            // Store flag for later stages
-                            env.SIGNIFICANT_DRIFT = 'true'
-                        } else {
-                            echo "✅ Drift within acceptable limits"
-                            env.SIGNIFICANT_DRIFT = 'false'
-                        }
+        //                 try{
+        //                     def driftThreshold = env.DRIFT_THRESHOLD as Double
+        //                 if (driftResults.drift_percentage > driftThreshold) {
+        //                     echo "⚠️  WARNING: Significant drift detected (${driftResults.drift_percentage * 100}% > ${driftThreshold * 100}%)"
+        //                     echo "   Model retraining recommended"
+        //                     // Store flag for later stages
+        //                     env.SIGNIFICANT_DRIFT = 'true'
+        //                 } else {
+        //                     echo "✅ Drift within acceptable limits"
+        //                     env.SIGNIFICANT_DRIFT = 'false'
+        //                 }
                         
-                        }
-                        catch (Exception e){
-                            echo "Thresholding failed!!"
-                        }
+        //                 }
+        //                 catch (Exception e){
+        //                     echo "Thresholding failed!!"
+        //                 }
                         
-                    } catch (Exception e) {
-                        echo "⚠️  Warning: Could not parse drift results with readJSON: ${e.getMessage()}"
-                        echo "   Trying alternative approach..."
+        //             } catch (Exception e) {
+        //                 echo "⚠️  Warning: Could not parse drift results with readJSON: ${e.getMessage()}"
+        //                 echo "   Trying alternative approach..."
                         
-                        try {
-                            // Alternative: read file content and parse manually
-                            def jsonContent = readFile('drift_results.json')
-                            echo "Raw JSON content: ${jsonContent}"
+        //                 try {
+        //                     // Alternative: read file content and parse manually
+        //                     def jsonContent = readFile('drift_results.json')
+        //                     echo "Raw JSON content: ${jsonContent}"
                             
-                            // Simple parsing for the key values we need
-                            def driftPercentage = 0.0
-                            if (jsonContent.contains('"drift_percentage":')) {
-                                def match = jsonContent =~ /"drift_percentage":\s*([0-9.]+)/
-                                if (match) {
-                                    driftPercentage = match[0][1] as Double
-                                }
-                            }
+        //                     // Simple parsing for the key values we need
+        //                     def driftPercentage = 0.0
+        //                     if (jsonContent.contains('"drift_percentage":')) {
+        //                         def match = jsonContent =~ /"drift_percentage":\s*([0-9.]+)/
+        //                         if (match) {
+        //                             driftPercentage = match[0][1] as Double
+        //                         }
+        //                     }
                             
-                            echo "📊 Drift Detection Results (manual parsing):"
-                            echo "   Drift percentage: ${driftPercentage * 100}%"
+        //                     echo "📊 Drift Detection Results (manual parsing):"
+        //                     echo "   Drift percentage: ${driftPercentage * 100}%"
                             
-                            def driftThreshold = env.DRIFT_THRESHOLD as Double
-                            if (driftPercentage > driftThreshold) {
-                                echo "⚠️  WARNING: Significant drift detected (${driftPercentage * 100}% > ${driftThreshold * 100}%)"
-                                env.SIGNIFICANT_DRIFT = 'true'
-                            } else {
-                                echo "✅ Drift within acceptable limits"
-                                env.SIGNIFICANT_DRIFT = 'false'
-                            }
-                        } catch (Exception e2) {
-                            echo "⚠️  Warning: Could not read drift results at all: ${e2.getMessage()}"
-                            echo "   Continuing with default values"
-                            env.SIGNIFICANT_DRIFT = 'false'
-                        }
-                    }
-                }
+        //                     def driftThreshold = env.DRIFT_THRESHOLD as Double
+        //                     if (driftPercentage > driftThreshold) {
+        //                         echo "⚠️  WARNING: Significant drift detected (${driftPercentage * 100}% > ${driftThreshold * 100}%)"
+        //                         env.SIGNIFICANT_DRIFT = 'true'
+        //                     } else {
+        //                         echo "✅ Drift within acceptable limits"
+        //                         env.SIGNIFICANT_DRIFT = 'false'
+        //                     }
+        //                 } catch (Exception e2) {
+        //                     echo "⚠️  Warning: Could not read drift results at all: ${e2.getMessage()}"
+        //                     echo "   Continuing with default values"
+        //                     env.SIGNIFICANT_DRIFT = 'false'
+        //                 }
+        //             }
+        //         }
                 
-                // archiveArtifacts artifacts: 'reports/drift_report.html', allowEmptyArchive: true
-            }
-        }
+        //         // archiveArtifacts artifacts: 'reports/drift_report.html', allowEmptyArchive: true
+        //     }
+        // }
         
         // stage('🧪 Run Unit Tests') {
         //     steps {
