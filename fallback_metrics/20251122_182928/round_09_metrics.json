@@ -1,0 +1,10 @@
+{
+  "timestamp": "2025-11-22T18:30:43.592567",
+  "mlflow_fallback": true,
+  "metrics": {
+    "val_loss": 0.5161101222038269,
+    "val_accuracy": 0.7511139512062073,
+    "val_auc": 0.8279638886451721,
+    "round": 9
+  }
+}

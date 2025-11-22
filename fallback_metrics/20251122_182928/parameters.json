@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-11-22T18:29:36.763098",
+  "mlflow_fallback": true,
+  "metrics": {
+    "parameters": {
+      "n_rounds": 10,
+      "n_clients": 3,
+      "batch_size": 32,
+      "client_learning_rate": 0.001,
+      "server_learning_rate": 1.0,
+      "shuffle_buffer": 1024,
+      "seed": 42
+    }
+  }
+}

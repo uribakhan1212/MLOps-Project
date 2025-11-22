@@ -1,0 +1,27 @@
+{
+  "timestamp": "2025-11-22T18:30:55.274626",
+  "mlflow_fallback": true,
+  "metrics": {
+    "model_path": "/mnt/d/FAST AI'22/MLOps project/MLOps-Project/models/tff_federated_diabetes_model.h5",
+    "model_type": "federated_learning",
+    "framework": "tensorflow_federated",
+    "algorithm": "FedAvg",
+    "task": "binary_classification",
+    "dataset": "BRFSS_2015_diabetes",
+    "timestamp": "2025-11-22T18:30:55.268448",
+    "final_metrics": {
+      "final_avg_loss": 0.5811120867729187,
+      "final_avg_accuracy": 0.7501304149627686,
+      "final_avg_auc": 0.8021478255589803,
+      "client_1_final_loss": 0.5825276374816895,
+      "client_1_final_accuracy": 0.7456740736961365,
+      "client_1_final_auc": 0.8029778003692627,
+      "client_2_final_loss": 0.584717333316803,
+      "client_2_final_accuracy": 0.7482216358184814,
+      "client_2_final_auc": 0.7959708571434021,
+      "client_3_final_loss": 0.5760912895202637,
+      "client_3_final_accuracy": 0.7564955353736877,
+      "client_3_final_auc": 0.8074948191642761
+    }
+  }
+}

@@ -9,11 +9,17 @@ import tensorflow as tf
 import numpy as np
 from prometheus_flask_exporter import PrometheusMetrics
 
+import mlflow
+import os
+
 # --- Configuration defaults (can be overridden via env vars) ---
 MODEL_PATH = os.getenv("MODEL_PATH", "models/tff_federated_diabetes_model.h5")
 LOG_FILE = os.getenv("LOG_FILE", "/var/log/inference_server.log")
 MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", 1_000_000))  # ~1MB default
 PREDICTION_THRESHOLD = float(os.getenv("PREDICTION_THRESHOLD", 0.5))
+
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow.mlops-fl.svc.cluster.local:5000")
+MODEL_VERSION = os.getenv("MODEL_VERSION", "unknown")
 
 # Feature names (keep as you had)
 FEATURE_NAMES = [
@@ -103,6 +109,18 @@ def create_app():
     def health_check():
         """Simple liveness check."""
         return jsonify({'status': 'alive'}), 200
+
+    @app.route('/model_info', methods=['GET'])
+    def model_info():
+        """Get model information including MLflow version"""
+        return jsonify({
+            'model_type': 'Federated Neural Network',
+            'framework': 'TensorFlow Federated',
+            'mlflow_tracking_uri': MLFLOW_TRACKING_URI,
+            'model_version': MODEL_VERSION,
+            'input_features': app.model_server.feature_names,
+            'output': 'Diabetes probability (0-1)'
+        }), 200
 
     @app.route('/readiness', methods=['GET'])
     def readiness_check():
