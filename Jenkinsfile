@@ -167,20 +167,27 @@ spec:
                 '''
                 
                 script {
-                    def driftResults = readJSON file: 'drift_results.json'
-                    
-                    echo "📊 Drift Detection Results:"
-                    echo "   Dataset drift: ${driftResults.dataset_drift}"
-                    echo "   Drifted features: ${driftResults.drifted_features}/${driftResults.total_features}"
-                    echo "   Drift percentage: ${driftResults.drift_percentage * 100}%"
-                    
-                    if (driftResults.drift_percentage > env.DRIFT_THRESHOLD.toFloat()) {
-                        echo "⚠️  WARNING: Significant drift detected (${driftResults.drift_percentage * 100}% > ${env.DRIFT_THRESHOLD.toFloat() * 100}%)"
-                        echo "   Model retraining recommended"
-                        // Store flag for later stages
-                        env.SIGNIFICANT_DRIFT = 'true'
-                    } else {
-                        echo "✅ Drift within acceptable limits"
+                    try {
+                        def driftResults = readJSON file: 'drift_results.json'
+                        
+                        echo "📊 Drift Detection Results:"
+                        echo "   Dataset drift: ${driftResults.dataset_drift}"
+                        echo "   Drifted features: ${driftResults.drifted_features}/${driftResults.total_features}"
+                        echo "   Drift percentage: ${driftResults.drift_percentage * 100}%"
+                        
+                        def driftThreshold = env.DRIFT_THRESHOLD as Double
+                        if (driftResults.drift_percentage > driftThreshold) {
+                            echo "⚠️  WARNING: Significant drift detected (${driftResults.drift_percentage * 100}% > ${driftThreshold * 100}%)"
+                            echo "   Model retraining recommended"
+                            // Store flag for later stages
+                            env.SIGNIFICANT_DRIFT = 'true'
+                        } else {
+                            echo "✅ Drift within acceptable limits"
+                            env.SIGNIFICANT_DRIFT = 'false'
+                        }
+                    } catch (Exception e) {
+                        echo "⚠️  Warning: Could not parse drift results: ${e.getMessage()}"
+                        echo "   Continuing with default values"
                         env.SIGNIFICANT_DRIFT = 'false'
                     }
                 }
