@@ -182,7 +182,7 @@ spec:
                         }
                         
                         }
-                        catch{
+                        catch (Exception e){
                             echo "Thresholding failed!!"
                         }
                         
