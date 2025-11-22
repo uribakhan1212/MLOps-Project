@@ -2,12 +2,7 @@
 // Handles: Training → Validation → Docker → Deployment → Monitoring → Drift Detection
 
 pipeline {
-    agent {
-        docker {
-            image 'python:3.10-slim'
-            args '-v /var/run/docker.sock:/var/run/docker.sock -u root'
-        }
-    }
+    agent any
     
     environment {
         // Docker Configuration
@@ -85,37 +80,61 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Install system dependencies
-                    apt-get update && apt-get install -y git curl wget apt-transport-https ca-certificates gnupg lsb-release
+                    echo "🔍 Checking system and installing dependencies..."
                     
-                    # Install Docker CLI
-                    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-                    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-                    apt-get update && apt-get install -y docker-ce-cli
-                    
-                    # Install kubectl for Kubernetes operations
-                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                    chmod +x kubectl
-                    mv kubectl /usr/local/bin/
-                    
-                    echo "✓ Python version: $(python --version)"
-                    echo "✓ Pip version: $(pip --version)"
-                    
-                    # Upgrade pip
-                    python -m pip install --upgrade pip
-                    
-                    # Install requirements
-                    if [ -f "requirements.txt" ]; then
-                        pip install -r requirements.txt
+                    # Check if we have sudo access
+                    if command -v sudo >/dev/null 2>&1; then
+                        SUDO="sudo"
                     else
-                        echo "⚠️ requirements.txt not found, installing basic packages..."
-                        pip install tensorflow pandas numpy scikit-learn mlflow requests evidently
+                        SUDO=""
                     fi
                     
-                    # Test imports
-                    python -c "import tensorflow as tf; print(f'✓ TensorFlow version: {tf.__version__}')" || echo "⚠️ TensorFlow not available"
-                    python -c "import mlflow; print(f'✓ MLflow version: {mlflow.__version__}')" || echo "⚠️ MLflow not available"
-                    python -c "import pandas as pd; print(f'✓ Pandas version: {pd.__version__}')" || echo "⚠️ Pandas not available"
+                    # Install Python if not available
+                    if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+                        echo "Installing Python..."
+                        if command -v apt-get >/dev/null 2>&1; then
+                            $SUDO apt-get update && $SUDO apt-get install -y python3 python3-pip python3-venv
+                        elif command -v yum >/dev/null 2>&1; then
+                            $SUDO yum install -y python3 python3-pip
+                        elif command -v apk >/dev/null 2>&1; then
+                            $SUDO apk add python3 py3-pip
+                        else
+                            echo "⚠️ Cannot install Python automatically"
+                        fi
+                    fi
+                    
+                    # Set Python command
+                    if command -v python3 >/dev/null 2>&1; then
+                        PYTHON_CMD="python3"
+                        PIP_CMD="pip3"
+                    elif command -v python >/dev/null 2>&1; then
+                        PYTHON_CMD="python"
+                        PIP_CMD="pip"
+                    else
+                        echo "❌ No Python found, using fallback"
+                        PYTHON_CMD="python3"
+                        PIP_CMD="pip3"
+                    fi
+                    
+                    echo "✓ Using Python: $PYTHON_CMD"
+                    $PYTHON_CMD --version || echo "Python version check failed"
+                    
+                    # Install pip if not available
+                    if ! command -v $PIP_CMD >/dev/null 2>&1; then
+                        echo "Installing pip..."
+                        curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+                        $PYTHON_CMD get-pip.py --user
+                        export PATH=$HOME/.local/bin:$PATH
+                    fi
+                    
+                    # Install basic packages
+                    echo "Installing Python packages..."
+                    $PIP_CMD install --user --upgrade pip || echo "Pip upgrade failed"
+                    
+                    # Install minimal required packages for the pipeline
+                    $PIP_CMD install --user requests pandas || echo "Basic packages installation failed"
+                    
+                    echo "✅ Environment setup complete"
                 '''
             }
         }
@@ -148,7 +167,11 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    python scripts/validate_data.py
+                    # Setup Python environment
+                    export PATH=$HOME/.local/bin:$PATH
+                    PYTHON_CMD=$(command -v python3 || command -v python || echo "python3")
+                    
+                    $PYTHON_CMD scripts/validate_data.py
                 '''
             }
         }
@@ -163,11 +186,16 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
-                    # Install evidently for drift detection (if not already installed)
-                    pip install evidently
+                    # Setup Python environment
+                    export PATH=$HOME/.local/bin:$PATH
+                    PYTHON_CMD=$(command -v python3 || command -v python || echo "python3")
+                    PIP_CMD=$(command -v pip3 || command -v pip || echo "pip3")
+                    
+                    # Install evidently for drift detection
+                    $PIP_CMD install --user evidently || echo "Evidently installation failed"
                     
                     mkdir -p reports
-                    python scripts/detect_drift.py
+                    $PYTHON_CMD scripts/detect_drift.py
                 '''
                 
                 script {
@@ -200,19 +228,24 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
+                    # Setup Python environment
+                    export PATH=$HOME/.local/bin:$PATH
+                    PYTHON_CMD=$(command -v python3 || command -v python || echo "python3")
+                    PIP_CMD=$(command -v pip3 || command -v pip || echo "pip3")
+                    
                     # Install pytest
-                    pip install pytest pytest-cov
+                    $PIP_CMD install --user pytest pytest-cov || echo "Pytest installation failed"
                     
                     # Create test directories
                     mkdir -p tests/unit test-results
                     
                     # Run tests (create basic test if none exist)
                     if [ ! -f "tests/unit/test_model.py" ]; then
-                        python scripts/create_basic_tests.py
+                        $PYTHON_CMD scripts/create_basic_tests.py
                     fi
                     
                     # Run tests
-                    pytest tests/unit/ \
+                    $HOME/.local/bin/pytest tests/unit/ \
                         --cov=src \
                         --cov-report=html \
                         --cov-report=term \
@@ -245,13 +278,21 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
+                    # Setup Python environment
+                    export PATH=$HOME/.local/bin:$PATH
+                    PYTHON_CMD=$(command -v python3 || command -v python || echo "python3")
+                    PIP_CMD=$(command -v pip3 || command -v pip || echo "pip3")
+                    
+                    # Install required packages for training
+                    $PIP_CMD install --user tensorflow mlflow pandas numpy scikit-learn || echo "Package installation failed"
+                    
                     # Set MLflow tracking URI
                     export MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
                     
                     echo "MLflow Tracking URI: ${MLFLOW_TRACKING_URI}"
                     
                     # Run federated training
-                    python federated_training.py
+                    $PYTHON_CMD federated_training.py
                     
                     # Verify model was created
                     if [ ! -f "models/tff_federated_diabetes_model.h5" ]; then
@@ -271,10 +312,14 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
+                    # Setup Python environment
+                    export PATH=$HOME/.local/bin:$PATH
+                    PYTHON_CMD=$(command -v python3 || command -v python || echo "python3")
+                    
                     export MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
                     
                     # Use enhanced validation script with fallback support
-                    python scripts/validate_mlflow_model.py \
+                    $PYTHON_CMD scripts/validate_mlflow_model.py \
                         --mlflow-uri ${MLFLOW_TRACKING_URI} \
                         --experiment-name diabetes-federated-learning \
                         --output model_metrics.json
@@ -313,10 +358,14 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
+                    # Setup Python environment
+                    export PATH=$HOME/.local/bin:$PATH
+                    PYTHON_CMD=$(command -v python3 || command -v python || echo "python3")
+                    
                     export MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
                     
                     # Use enhanced download script with fallback support
-                    python scripts/download_mlflow_model.py \
+                    $PYTHON_CMD scripts/download_mlflow_model.py \
                         --mlflow-uri ${MLFLOW_TRACKING_URI} \
                         --model-name diabetes-federated-model \
                         --output-dir models || echo "Using local model"
@@ -485,15 +534,19 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
+                    # Setup Python environment
+                    export PATH=$HOME/.local/bin:$PATH
+                    PYTHON_CMD=$(command -v python3 || command -v python || echo "python3")
+                    
                     # Create test directories
                     mkdir -p tests/integration
                     
                     # Create or run integration tests
                     if [ ! -f "tests/integration/test_api.py" ]; then
-                        python scripts/create_integration_tests.py
+                        $PYTHON_CMD scripts/create_integration_tests.py
                     fi
                     
-                    python tests/integration/test_api.py || echo "Integration tests completed"
+                    $PYTHON_CMD tests/integration/test_api.py || echo "Integration tests completed"
                 '''
             }
         }
@@ -505,12 +558,17 @@ pipeline {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
                 sh '''
+                    # Setup Python environment
+                    export PATH=$HOME/.local/bin:$PATH
+                    PYTHON_CMD=$(command -v python3 || command -v python || echo "python3")
+                    PIP_CMD=$(command -v pip3 || command -v pip || echo "pip3")
+                    
                     # Install locust for load testing
-                    pip install locust
+                    $PIP_CMD install --user locust || echo "Locust installation failed"
                     
                     # Create or run load tests
                     if [ ! -f "tests/load_test.py" ]; then
-                        python scripts/create_load_tests.py
+                        $PYTHON_CMD scripts/create_load_tests.py
                     fi
                     
                     echo "✓ Load test script ready"
