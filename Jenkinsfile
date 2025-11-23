@@ -983,23 +983,33 @@ Next Steps:
         }
         
         always {
-            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-            echo '🧹 Cleanup'
-            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-            
-            sh '''
-                # Remove old Docker images to save space (with better error handling)
-                echo "🧹 Cleaning up old Docker images..."
-                docker images --format "table {{.Repository}}:{{.Tag}}\\t{{.ID}}" | grep ${IMAGE_NAME} | grep -v ${IMAGE_TAG} | awk '{print $2}' | xargs -r docker rmi -f || echo "No old images to remove"
+            script {
+                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                echo '🧹 Cleanup'
+                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
-                # Clean up Docker system
-                docker system prune -f || echo "Docker system prune completed"
+                try {
+                    sh '''
+                        # Remove old Docker images to save space (with better error handling)
+                        echo "🧹 Cleaning up old Docker images..."
+                        docker images --format "table {{.Repository}}:{{.Tag}}\\t{{.ID}}" | grep ${IMAGE_NAME} | grep -v ${IMAGE_TAG} | awk '{print $2}' | xargs -r docker rmi -f || echo "No old images to remove"
+                        
+                        # Clean up Docker system
+                        docker system prune -f || echo "Docker system prune completed"
                 
-                echo "✅ Docker cleanup completed"
-            '''
-            
-            // Clean workspace (alternative to cleanWs)
-            deleteDir()
+                        echo "✅ Docker cleanup completed"
+                    '''
+                } catch (Exception e) {
+                    echo "⚠️ Cleanup failed: ${e.getMessage()}"
+                }
+                
+                // Clean workspace (alternative to cleanWs)
+                try {
+                    deleteDir()
+                } catch (Exception e) {
+                    echo "⚠️ Workspace cleanup failed: ${e.getMessage()}"
+                }
+            }
         }
     }
 }
