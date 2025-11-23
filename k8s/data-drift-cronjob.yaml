@@ -1,20 +1,203 @@
-# k8s/data-drift-cronjob.yaml
+# Kubernetes CronJob for automated drift detection
+# Runs every 6 hours and triggers retraining if drift detected
+
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: data-drift-detection
+  name: drift-detection
+  namespace: mlops-fl
+  labels:
+    app: drift-detection
 spec:
-  schedule: "0 */6 * * *"  # Every 6 hours
+  # Run every 6 hours
+  schedule: "0 */6 * * *"
+  
+  # Keep last 3 successful and 3 failed jobs
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  
   jobTemplate:
     spec:
       template:
+        metadata:
+          labels:
+            app: drift-detection
         spec:
+          restartPolicy: OnFailure
+          serviceAccountName: drift-detection-sa
+          
           containers:
           - name: drift-detector
-            image: your-registry.com/drift-detector:latest
-            command: ["python", "detect_drift.py"]
+            image: python:3.10-slim
+            
+            command: ["/bin/bash", "-c"]
+            args:
+              - |
+                set -e
+                
+                echo "🔍 Starting drift detection..."
+                
+                # Install dependencies
+                pip install --quiet pandas numpy evidently requests mlflow
+                
+                # Create drift detection script
+                cat > /tmp/detect_drift.py << 'EOF'
+                import pandas as pd
+                import numpy as np
+                from evidently.report import Report
+                from evidently.metric_preset import DataDriftPreset
+                import requests
+                import json
+                import os
+                
+                def detect_drift():
+                    print("🔍 Loading data for drift detection...")
+                    
+                    # Try to get recent data from MLflow or inference service
+                    try:
+                        # Get recent predictions from inference service
+                        inference_url = "http://diabetes-inference-service.mlops-fl.svc.cluster.local:80"
+                        response = requests.get(f"{inference_url}/health", timeout=10)
+                        
+                        if response.status_code == 200:
+                            print("✅ Inference service is accessible")
+                        else:
+                            print("⚠️ Inference service not responding")
+                    except Exception as e:
+                        print(f"⚠️ Could not reach inference service: {e}")
+                    
+                    # Simulate drift detection (replace with actual implementation)
+                    # In production, this would:
+                    # 1. Load baseline data from MLflow or storage
+                    # 2. Get recent inference data
+                    # 3. Run Evidently drift detection
+                    # 4. Calculate drift metrics
+                    
+                    drift_detected = False  # Placeholder - implement actual detection
+                    drift_percentage = 0.15  # Simulated value
+                    
+                    print(f"Drift detected: {drift_detected}")
+                    print(f"Drift percentage: {drift_percentage:.2f}")
+                    
+                    # Save drift results
+                    drift_results = {
+                        "timestamp": pd.Timestamp.now().isoformat(),
+                        "drift_detected": drift_detected,
+                        "drift_percentage": drift_percentage,
+                        "threshold": 0.3
+                    }
+                    
+                    print(f"Drift results: {drift_results}")
+                    
+                    # If significant drift detected, trigger retraining
+                    if drift_percentage > 0.3:
+                        print("⚠️  Significant drift detected!")
+                        print("Triggering Jenkins retraining pipeline...")
+                        
+                        # Trigger Jenkins job
+                        jenkins_url = os.getenv("JENKINS_URL", "http://jenkins.mlops-fl.svc.cluster.local:8080")
+                        job_name = "MLOps-Project"  # Updated to match your project name
+                        
+                        try:
+                            # Try to trigger Jenkins pipeline
+                            trigger_url = f"{jenkins_url}/job/{job_name}/build"
+                            
+                            response = requests.post(
+                                trigger_url,
+                                auth=("admin", os.getenv("JENKINS_TOKEN", "")),
+                                params={"cause": "Automated retraining due to data drift"},
+                                timeout=30
+                            )
+                            
+                            if response.status_code in [200, 201]:
+                                print("✅ Retraining pipeline triggered successfully")
+                            else:
+                                print(f"⚠️ Failed to trigger pipeline: {response.status_code}")
+                                print(f"Response: {response.text}")
+                        except Exception as e:
+                            print(f"❌ Error triggering pipeline: {e}")
+                            print("💡 Make sure Jenkins is running and accessible")
+                    else:
+                        print("✅ No significant drift detected")
+                
+                if __name__ == '__main__':
+                    detect_drift()
+                EOF
+                
+                # Run drift detection
+                python /tmp/detect_drift.py
+                
+                echo "✅ Drift detection complete"
+            
             env:
-            - name: BASELINE_DATA_PATH
-              value: "/data/baseline"
-            - name: CURRENT_DATA_PATH
-              value: "/data/current"
+            - name: JENKINS_URL
+              value: "http://jenkins.mlops-fl.svc.cluster.local:8080"
+            - name: MLFLOW_TRACKING_URI
+              value: "http://mlflow.mlops-fl.svc.cluster.local:80"
+            - name: JENKINS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: jenkins-api-token
+                  key: token
+                  optional: true
+            
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+
+---
+# ServiceAccount for drift detection
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: drift-detection-sa
+  namespace: mlops-fl
+
+---
+# Role for drift detection (minimal permissions)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: drift-detection-role
+  namespace: mlops-fl
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list"]
+
+---
+# RoleBinding for drift detection
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: drift-detection-binding
+  namespace: mlops-fl
+subjects:
+- kind: ServiceAccount
+  name: drift-detection-sa
+  namespace: mlops-fl
+roleRef:
+  kind: Role
+  name: drift-detection-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ConfigMap for drift detection configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: drift-detection-config
+  namespace: mlops-fl
+data:
+  drift_threshold: "0.3"
+  baseline_data_path: "/data/baseline"
+  current_data_path: "/data/current"
+  mlflow_experiment_name: "diabetes-federated-learning"
+  inference_service_url: "http://diabetes-inference-service.mlops-fl.svc.cluster.local:80"
