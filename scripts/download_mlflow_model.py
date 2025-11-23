@@ -108,7 +108,7 @@ def copy_from_fallback(fallback_dir: str, output_dir: str) -> Optional[str]:
 
 def main():
     parser = argparse.ArgumentParser(description="Download model from MLflow or copy from fallback")
-    parser.add_argument("--mlflow-uri", default=os.getenv("MLFLOW_TRACKING_URI", "http://localhost:8082"),
+    parser.add_argument("--mlflow-uri", default=os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"),
                        help="MLflow tracking URI")
     parser.add_argument("--model-name", default="diabetes-federated-model",
                        help="MLflow registered model name")

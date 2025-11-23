@@ -130,7 +130,7 @@ def backup_existing_file(filepath: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Validate model metrics from MLflow or fallback")
-    parser.add_argument("--mlflow-uri", default=os.getenv("MLFLOW_TRACKING_URI", "http://localhost:8082"),
+    parser.add_argument("--mlflow-uri", default=os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"),
                        help="MLflow tracking URI")
     parser.add_argument("--experiment-name", default="diabetes-federated-learning",
                        help="MLflow experiment name")
