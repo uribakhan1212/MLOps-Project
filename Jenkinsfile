@@ -145,34 +145,39 @@ spec:
                     # AGGRESSIVE STRATEGY: Install TFF without any dependency checks
                     echo "🔧 Attempting aggressive TFF installation..."
                     
-                    # First install compatible dependencies manually (with --user for permissions)
-                    pip install --user --no-cache-dir absl-py attrs cachetools dm-tree farmhashpy grpcio || echo "Some dependencies failed"
+                    # WORKAROUND: Create custom installation directory with write permissions
+                    echo "🔧 Creating custom Python package directory..."
+                    mkdir -p /tmp/custom_packages
+                    export PYTHONPATH="/tmp/custom_packages:\$PYTHONPATH"
                     
-                    # Force install TFF 0.78.0 without any checks (using --user)
-                    if pip install --user --no-cache-dir --no-deps --force-reinstall --disable-pip-version-check tensorflow-federated==0.78.0; then
-                        echo "✅ SUCCESS: TensorFlow Federated 0.78.0 force-installed without dependencies"
-                        echo "⚠️  Dependencies installed separately - should work for federated training"
-                    # Fallback: Try older version without deps (using --user)
-                    elif pip install --user --no-cache-dir --no-deps --force-reinstall tensorflow-federated==0.33.0; then
-                        echo "✅ SUCCESS: TensorFlow Federated 0.33.0 installed without dependencies"
-                        echo "⚠️  Using older version - basic federated training should work"
-                    # Last resort: Install any available version (using --user)
-                    elif pip install --user --no-cache-dir --no-deps --force-reinstall tensorflow-federated; then
-                        echo "✅ SUCCESS: TensorFlow Federated (latest available) installed without dependencies"
-                    # Try with sudo if available
-                    elif sudo pip install --no-cache-dir --no-deps --force-reinstall tensorflow-federated==0.33.0; then
-                        echo "✅ SUCCESS: TensorFlow Federated installed with sudo"
+                    # Try to install TFF to custom directory
+                    if pip install --no-cache-dir --no-deps --target /tmp/custom_packages tensorflow-federated==0.33.0; then
+                        echo "✅ SUCCESS: TensorFlow Federated 0.33.0 installed to custom directory"
+                        echo "✅ Custom installation path: /tmp/custom_packages"
+                    elif pip install --no-cache-dir --no-deps --target /tmp/custom_packages tensorflow-federated; then
+                        echo "✅ SUCCESS: TensorFlow Federated (latest available) installed to custom directory"
                     else
-                        echo "❌ CRITICAL: All TensorFlow Federated installation methods failed"
-                        echo "❌ Permission denied errors - Jenkins agent needs proper Python permissions"
-                        echo "💡 SOLUTIONS:"
-                        echo "   1. Update Jenkins agent to run as root or with proper permissions"
-                        echo "   2. Create new Jenkins agent with Python 3.11 and proper permissions"
-                        echo "   3. Use --user installs (attempted above)"
+                        echo "❌ Even custom directory installation failed"
+                        echo "🔧 Trying manual download and extraction..."
+                        
+                        # Manual download and extraction as last resort
+                        cd /tmp
+                        if wget -q https://files.pythonhosted.org/packages/py2.py3/t/tensorflow-federated/tensorflow_federated-0.33.0-py2.py3-none-any.whl; then
+                            echo "✅ Downloaded TFF wheel file"
+                            unzip -q tensorflow_federated-0.33.0-py2.py3-none-any.whl -d /tmp/custom_packages/
+                            echo "✅ Extracted TFF to custom directory"
+                        else
+                            echo "❌ CRITICAL: All installation methods failed"
+                            echo "❌ TensorFlow Federated cannot be installed with current container setup"
+                            echo "💡 IMMEDIATE SOLUTION REQUIRED:"
+                            echo "   Update Jenkins agent Dockerfile to run as root:"
+                            echo "   USER root"
+                            echo "   Or use Python 3.11 base image with proper permissions"
+                        fi
+                        cd -
                     fi
                     
-                    # Ensure user site-packages is in Python path
-                    export PYTHONPATH="\$HOME/.local/lib/python3.13/site-packages:\$PYTHONPATH"
+                    echo "🔍 Custom PYTHONPATH: \$PYTHONPATH"
                     
                     # Test if TFF can be imported (basic functionality test)
                     echo "🧪 Testing TensorFlow Federated import..."
