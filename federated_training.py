@@ -224,11 +224,11 @@ class TFFFederatedLearningOrchestrator:
             print(f"⚠️ MLflow server connectivity test failed: {e}")
             print("   This may indicate MLflow server is not running or accessible")
         
-        # Create robust MLflow client with increased retries
+        # Create robust MLflow client with minimal retries
         mlflow_client = RobustMLflowClient(
             tracking_uri=mlflow_uri,
-            max_retries=5,        # Increased from 3 to 5 retries
-            retry_delay=3.0       # Increased from 2.0 to 3.0 seconds delay
+            max_retries=1,        # Reduced to 1 retry for faster failure detection
+            retry_delay=2.0       # Reduced delay to 2.0 seconds
         )
         
         # Setup experiment

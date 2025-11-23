@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class RobustMLflowClient:
     """MLflow client with robust error handling and retry logic"""
     
-    def __init__(self, tracking_uri: str, max_retries: int = 3, retry_delay: float = 2.0):
+    def __init__(self, tracking_uri: str, max_retries: int = 1, retry_delay: float = 2.0):
         self.tracking_uri = tracking_uri
         self.max_retries = max_retries
         self.retry_delay = retry_delay
@@ -62,14 +62,15 @@ class RobustMLflowClient:
                 if attempt < self.max_retries - 1:
                     logger.info(f"   ⏳ Retrying in {self.retry_delay} seconds...")
                     time.sleep(self.retry_delay)
+                else:
+                    logger.info("   ⚡ Fast failure mode: No retries, switching to fallback metrics")
         
-        logger.error("❌ Failed to connect to MLflow after all retries")
-        logger.error("   📋 Troubleshooting steps:")
-        logger.error("   1. Verify MLflow server is running: docker ps | grep mlflow")
-        logger.error("   2. Check port accessibility: curl http://localhost:5000/health")
-        logger.error("   3. Verify MLFLOW_TRACKING_URI environment variable")
-        logger.error("   4. Check firewall/network connectivity")
-        logger.error("   ℹ️ Training will continue with local fallback metrics")
+        logger.error("❌ Failed to connect to MLflow (fast failure mode)")
+        logger.error("   📋 Quick troubleshooting:")
+        logger.error("   1. Check port-forward: kubectl port-forward -n mlops-fl svc/mlflow 5000:5000")
+        logger.error("   2. Test connectivity: curl http://localhost:5000/health")
+        logger.error("   3. Verify environment: echo $MLFLOW_TRACKING_URI")
+        logger.error("   ⚡ Fast failure enabled - training continues with local fallback metrics")
         self.enabled = False
     
     def setup_experiment(self, experiment_name: str) -> Optional[str]:
@@ -110,8 +111,10 @@ class RobustMLflowClient:
                 logger.warning(f"Experiment setup attempt {attempt + 1}/{self.max_retries} failed: {e}")
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
+                else:
+                    logger.info("   ⚡ Fast failure: No more retries for experiment setup")
         
-        logger.error(f"❌ Failed to setup experiment after all retries")
+        logger.error(f"❌ Failed to setup experiment (fast failure mode)")
         self.enabled = False
         return None
     
@@ -158,7 +161,7 @@ class RobustMLflowClient:
                         time.sleep(self.retry_delay)
             
             if not run_started:
-                logger.error("❌ Failed to start MLflow run after all retries")
+                logger.error("❌ Failed to start MLflow run (fast failure mode)")
                 self.enabled = False
                 yield None
                 return
@@ -216,7 +219,7 @@ class RobustMLflowClient:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
         
-        logger.error("❌ Failed to log parameters after all retries")
+        logger.error("❌ Failed to log parameters (fast failure mode)")
         return False
     
     def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None) -> bool:
@@ -245,7 +248,7 @@ class RobustMLflowClient:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
         
-        logger.error("❌ Failed to log metrics after all retries")
+        logger.error("❌ Failed to log metrics (fast failure mode)")
         return False
     
     def _validate_run_exists(self) -> bool:
@@ -290,7 +293,7 @@ class RobustMLflowClient:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
         
-        logger.error("❌ Failed to log model after all retries")
+        logger.error("❌ Failed to log model (fast failure mode)")
         return False
     
     def log_artifact(self, local_path: str, artifact_path: Optional[str] = None) -> bool:
@@ -309,7 +312,7 @@ class RobustMLflowClient:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
         
-        logger.error("❌ Failed to log artifact after all retries")
+        logger.error("❌ Failed to log artifact (fast failure mode)")
         return False
     
     def set_tags(self, tags: Dict[str, str]) -> bool:
@@ -328,7 +331,7 @@ class RobustMLflowClient:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
         
-        logger.error("❌ Failed to set tags after all retries")
+        logger.error("❌ Failed to set tags (fast failure mode)")
         return False
     
     def is_enabled(self) -> bool:
