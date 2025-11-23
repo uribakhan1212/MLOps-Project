@@ -137,10 +137,22 @@ spec:
                     echo "✓ Docker version: $(docker --version)"
                     echo "✓ Kubectl version: $(kubectl version --client)"
                     
-                    # Install TensorFlow Federated specifically
+                    # Install TensorFlow Federated with compatibility fixes
                     echo "📦 Installing TensorFlow Federated..."
-                    pip install tensorflow-federated>=0.78.0 || echo "⚠️  TensorFlow Federated installation failed, continuing..."
-                    echo "✓ TensorFlow Federated installation attempted"
+                    
+                    # Try different approaches for TFF installation
+                    if pip install --no-cache-dir tensorflow-federated==0.78.0; then
+                        echo "✓ TensorFlow Federated 0.78.0 installed successfully"
+                    elif pip install --no-cache-dir --no-build-isolation tensorflow-federated==0.78.0; then
+                        echo "✓ TensorFlow Federated installed with --no-build-isolation"
+                    elif pip install --no-cache-dir tensorflow-federated==0.77.0; then
+                        echo "✓ TensorFlow Federated 0.77.0 (older version) installed successfully"
+                    else
+                        echo "⚠️  TensorFlow Federated installation failed with all methods"
+                        echo "⚠️  This is likely due to Python 3.13 compatibility issues"
+                        echo "⚠️  Federated training will use fallback implementation"
+                        echo "⚠️  Consider using Python 3.11 or 3.12 for better TFF compatibility"
+                    fi
                     
                     # Test critical imports
                     echo "🧪 Testing critical imports..."
