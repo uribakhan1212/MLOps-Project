@@ -241,7 +241,7 @@ spec:
                     }
                 }
                 
-                // archiveArtifacts artifacts: 'reports/drift_report.html', allowEmptyArchive: true
+                archiveArtifacts artifacts: 'reports/drift_report.html', allowEmptyArchive: true
             }
         }
         
@@ -332,10 +332,7 @@ spec:
                         --output model_metrics.json || echo "Validation script failed, continuing..."
                     
                     echo "Files after validation: $(ls -la model_metrics.json || echo 'model_metrics.json not created')"
-                    
-                    
-EOF
-                    fi
+             
                 '''
                 
                 script {
