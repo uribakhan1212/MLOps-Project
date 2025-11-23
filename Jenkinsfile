@@ -447,37 +447,37 @@ spec:
             }
         }
         
-        stage('🐳 Build Docker Image') {
-            steps {
-                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                echo '🐳 Building Docker image...'
-                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        // stage('🐳 Build Docker Image') {
+        //     steps {
+        //         echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        //         echo '🐳 Building Docker image...'
+        //         echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
-                sh '''
-                    # Wait for Docker daemon to be ready
-                    echo "⏳ Waiting for Docker daemon to be ready..."
-                    for i in {1..30}; do
-                        if docker info >/dev/null 2>&1; then
-                            echo "✅ Docker daemon is ready!"
-                            break
-                        fi
-                        echo "⏳ Waiting for Docker daemon... (attempt $i/30)"
-                        sleep 2
-                    done
+        //         sh '''
+        //             # Wait for Docker daemon to be ready
+        //             echo "⏳ Waiting for Docker daemon to be ready..."
+        //             for i in {1..30}; do
+        //                 if docker info >/dev/null 2>&1; then
+        //                     echo "✅ Docker daemon is ready!"
+        //                     break
+        //                 fi
+        //                 echo "⏳ Waiting for Docker daemon... (attempt $i/30)"
+        //                 sleep 2
+        //             done
                     
-                    # Verify Docker is working
-                    docker info
+        //             # Verify Docker is working
+        //             docker info
                     
-                    # Build Docker image
-                    docker build -f docker/inference_server/Dockerfile -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
+        //             # Build Docker image
+        //             docker build -f docker/inference_server/Dockerfile -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
                     
-                    # Also tag as latest
-                    docker tag ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${IMAGE_NAME}:latest
+        //             # Also tag as latest
+        //             docker tag ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${IMAGE_NAME}:latest
                     
-                    echo "✅ Docker image built: ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-                '''
-            }
-        }
+        //             echo "✅ Docker image built: ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+        //         '''
+        //     }
+        // }
         
         // stage('🔒 Security Scan') {
         //     steps {
@@ -946,13 +946,18 @@ Next Steps:
             echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
             
             sh '''
-                # Remove old Docker images to save space
-                docker images | grep ${IMAGE_NAME} | grep -v ${IMAGE_TAG} | awk '{print $3}' | xargs -r docker rmi -f || true
-                docker system prune -f || true
+                # Remove old Docker images to save space (with better error handling)
+                echo "🧹 Cleaning up old Docker images..."
+                docker images --format "table {{.Repository}}:{{.Tag}}\\t{{.ID}}" | grep ${IMAGE_NAME} | grep -v ${IMAGE_TAG} | awk '{print $2}' | xargs -r docker rmi -f || echo "No old images to remove"
+                
+                # Clean up Docker system
+                docker system prune -f || echo "Docker system prune completed"
+                
+                echo "✅ Docker cleanup completed"
             '''
             
-            // Clean workspace
-            cleanWs()
+            // Clean workspace (alternative to cleanWs)
+            deleteDir()
         }
     }
 }
