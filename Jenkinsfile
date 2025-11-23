@@ -56,6 +56,10 @@ spec:
         }
     }
     
+    triggers {
+        pollSCM('H/5 * * * *')  // Poll SCM every 5 minutes for changes
+    }
+    
     environment {
         // Docker Configuration
         DOCKER_REGISTRY = 'docker.io'  // Change to your registry
@@ -67,8 +71,8 @@ spec:
         K8S_NAMESPACE = 'mlops-fl'
         // Using ServiceAccount - no credentials needed
         
-        // MLflow Configuration
-        MLFLOW_TRACKING_URI = 'http://mlflow.mlops-fl.svc.cluster.local:5000'
+        // MLflow Configuration - Kubernetes service (fallback to local)
+        MLFLOW_TRACKING_URI = "${env.MLFLOW_URI ?: 'http://mlflow.mlops-fl.svc.cluster.local:5000'}"
         MLFLOW_EXPERIMENT_NAME = 'diabetes-federated-learning'
         MODEL_NAME = 'diabetes-federated-model'
         
@@ -291,6 +295,22 @@ spec:
         //     }
         // }
         
+        stage('🔗 Test MLflow Connectivity') {
+            steps {
+                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                echo '🔗 Testing MLflow connectivity...'
+                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                
+                sh '''
+                    export MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+                    echo "Testing MLflow at: ${MLFLOW_TRACKING_URI}"
+                    
+                    # Run MLflow connectivity check
+                    python check_mlflow_status.py || echo "MLflow connectivity check completed with warnings"
+                '''
+            }
+        }
+        
         stage('🤖 Train Federated Model') {
             when {
                 anyOf {
@@ -311,6 +331,30 @@ spec:
                     export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
                     
                     echo "MLflow Tracking URI: ${MLFLOW_TRACKING_URI}"
+                    
+                    # Test MLflow connectivity before training
+                    echo "🔍 Final MLflow connectivity test..."
+                    python -c "
+import mlflow
+import requests
+import os
+
+uri = os.getenv('MLFLOW_TRACKING_URI')
+print(f'Testing: {uri}')
+
+try:
+    if uri.startswith('http'):
+        response = requests.get(f'{uri}/health', timeout=10)
+        print(f'HTTP Status: {response.status_code}')
+    
+    mlflow.set_tracking_uri(uri)
+    client = mlflow.tracking.MlflowClient()
+    experiments = client.search_experiments()
+    print(f'✅ MLflow ready: {len(experiments)} experiments found')
+except Exception as e:
+    print(f'⚠️ MLflow issue: {e}')
+    print('Continuing with fallback metrics...')
+"
                     
                     # Run federated training
                     python federated_training.py
@@ -882,7 +926,7 @@ Monitoring Services:
 Access Instructions:
   1. Prometheus:    kubectl port-forward -n ${K8S_NAMESPACE} svc/prometheus-server 9090:80
   2. Grafana:       kubectl port-forward -n ${K8S_NAMESPACE} svc/grafana 3000:80
-  3. MLflow:        kubectl port-forward -n ${K8S_NAMESPACE} svc/mlflow 8082:80
+  3. MLflow:        kubectl port-forward -n ${K8S_NAMESPACE} svc/mlflow 5000:5000
   4. API:           kubectl port-forward -n ${K8S_NAMESPACE} svc/diabetes-inference-service 8083:80
 
 Next Steps:
