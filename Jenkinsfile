@@ -137,6 +137,9 @@ spec:
                     echo "✓ Docker version: $(docker --version)"
                     echo "✓ Kubectl version: $(kubectl version --client)"
 
+                    # Fix protobuf compatibility for TensorFlow Federated
+                    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+                    
                     python -c "import tensorflow as tf; print(f'✓ TensorFlow version: {tf.__version__}')" || echo "⚠️  TensorFlow import failed"
                     python -c "import tensorflow_federated as tff; print(f'✓ TensorFlow Federated version: {tff.__version__}')" || echo "⚠️  TensorFlow Federated import failed"
                     python -c "import mlflow; print(f'✓ MLflow version: {mlflow.__version__}')" || echo "⚠️  MLflow import failed"
@@ -303,6 +306,9 @@ spec:
                 sh '''
                     # Set MLflow tracking URI
                     export MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+                    
+                    # Fix protobuf compatibility for TensorFlow Federated
+                    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
                     
                     echo "MLflow Tracking URI: ${MLFLOW_TRACKING_URI}"
                     
