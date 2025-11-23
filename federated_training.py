@@ -201,7 +201,7 @@ class TFFFederatedLearningOrchestrator:
         print("=" * 70)
 
         # Initialize robust MLflow client
-        mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:8082")
+        mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5003")
         print(f"MLflow Tracking URI: {mlflow_uri}")
         
         # Create robust MLflow client
