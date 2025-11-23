@@ -11,7 +11,7 @@ spec:
   serviceAccountName: jenkins-deployer
   containers:
   - name: jnlp
-    image: uribakhan/jenkins-agent-python:latest
+    image: uribakhan/jenkins-agent-mlops:latest
     env:
     - name: DOCKER_HOST
       value: tcp://127.0.0.1:2375
@@ -137,6 +137,8 @@ spec:
                     echo "✓ Docker version: $(docker --version)"
                     echo "✓ Kubectl version: $(kubectl version --client)"
 
+                    python -c "import tensorflow as tf; print(f'✓ TensorFlow version: {tf.__version__}')" || echo "⚠️  TensorFlow import failed"
+                    python -c "import tensorflow_federated as tff; print(f'✓ TensorFlow Federated version: {tff.__version__}')" || echo "⚠️  TensorFlow Federated import failed"
                     python -c "import mlflow; print(f'✓ MLflow version: {mlflow.__version__}')" || echo "⚠️  MLflow import failed"
                     python -c "import pandas as pd; print(f'✓ Pandas version: {pd.__version__}')" || echo "⚠️  Pandas import failed"
                     python -c "import numpy as np; print(f'✓ NumPy version: {np.__version__}')" || echo "⚠️  NumPy import failed"
