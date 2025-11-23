@@ -83,7 +83,7 @@ spec:
         
         // Data Drift Configuration
         DRIFT_CHECK_ENABLED = 'true'
-        DRIFT_THRESHOLD = '0.3'
+        DRIFT_THRESHOLD = '0.02'
         
         // Monitoring Configuration
         PROMETHEUS_URL = 'http://prometheus-server.mlops-fl.svc.cluster.local:80'
@@ -201,7 +201,13 @@ spec:
                 
                 sh '''
                     mkdir -p reports
-                    python scripts/detect_drift.py
+                    
+                    echo "🔍 Running enhanced drift detection using inference data..."
+                    python scripts/detect_drift_inference.py
+                    
+                    echo "📊 Drift detection completed"
+                    ls -la drift_results.json || echo "drift_results.json not created"
+                    ls -la reports/drift_report.html || echo "drift_report.html not created"
                 '''
                 
                 script {
@@ -221,28 +227,40 @@ spec:
                             def driftedFeaturesMatch = jsonContent =~ /"drifted_features":\s*([0-9]+)/
                             def totalFeaturesMatch = jsonContent =~ /"total_features":\s*([0-9]+)/
                             def driftPercentageMatch = jsonContent =~ /"drift_percentage":\s*([0-9.]+)/
+                            def dataAddedMatch = jsonContent =~ /"data_added_to_training":\s*(true|false)/
+                            def driftedFeatureNamesMatch = jsonContent =~ /"drifted_feature_names":\s*\[([^\]]*)\]/
                             
                             def driftResults = [
                                 dataset_drift: datasetDriftMatch ? datasetDriftMatch[0][1] == 'true' : false,
                                 drifted_features: driftedFeaturesMatch ? driftedFeaturesMatch[0][1] as Integer : 0,
                                 total_features: totalFeaturesMatch ? totalFeaturesMatch[0][1] as Integer : 0,
-                                drift_percentage: driftPercentageMatch ? driftPercentageMatch[0][1] as Double : 0.0
+                                drift_percentage: driftPercentageMatch ? driftPercentageMatch[0][1] as Double : 0.0,
+                                data_added_to_training: dataAddedMatch ? dataAddedMatch[0][1] == 'true' : false,
+                                drifted_feature_names: driftedFeatureNamesMatch ? driftedFeatureNamesMatch[0][1] : ''
                             ]
                             echo "📄 Manual parsing successful!"
                             
-                            echo "📊 Drift Detection Results:"
+                            echo "📊 Enhanced Drift Detection Results:"
                             echo "   Dataset drift: ${driftResults.dataset_drift}"
                             echo "   Drifted features: ${driftResults.drifted_features}/${driftResults.total_features}"
                             echo "   Drift percentage: ${driftResults.drift_percentage * 100}%"
+                            echo "   Data source: dashboards/data/inference_data.json"
+                            echo "   Data added to training: ${driftResults.data_added_to_training}"
+                            if (driftResults.drifted_feature_names) {
+                                echo "   Affected features: ${driftResults.drifted_feature_names}"
+                            }
                             
                             def driftThreshold = env.DRIFT_THRESHOLD as Double
                             if (driftResults.drift_percentage > driftThreshold) {
-                                echo "⚠️  WARNING: Significant drift detected (${driftResults.drift_percentage * 100}% > ${driftThreshold * 100}%)"
-                                echo "   Model retraining recommended"
+                                echo "🚨 SIGNIFICANT DRIFT DETECTED!"
+                                echo "   Drift percentage: ${driftResults.drift_percentage * 100}% > ${driftThreshold * 100}%"
+                                echo "   Inference data has been added to training data"
+                                echo "   Model retraining will proceed with updated data"
                                 env.SIGNIFICANT_DRIFT = 'true'
                             } else {
-                                echo "✅ Drift within acceptable limits"
-                                env.SIGNIFICANT_DRIFT = 'true'
+                                echo "✅ Drift within acceptable limits (${driftResults.drift_percentage * 100}% <= ${driftThreshold * 100}%)"
+                                echo "   No retraining needed at this time"
+                                env.SIGNIFICANT_DRIFT = 'false'
                             }
                         } else {
                             echo "⚠️  drift_results.json not found, using defaults"
@@ -255,7 +273,7 @@ spec:
                     }
                 }
                 
-                archiveArtifacts artifacts: 'reports/drift_report.html', allowEmptyArchive: true
+                archiveArtifacts artifacts: 'reports/drift_report.html, reports/training_data_updates.json, drift_results.json', allowEmptyArchive: true
             }
         }
         
