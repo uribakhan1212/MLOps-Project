@@ -155,6 +155,10 @@ spec:
                     echo "🔧 Installing TFF dependencies to custom directory..."
                     pip install --no-cache-dir --target /tmp/custom_packages attrs absl-py cachetools dm-tree farmhashpy grpcio || echo "Some dependencies failed"
                     
+                    # Install tensorflow-privacy (required by TFF differential privacy module)
+                    echo "🔧 Installing tensorflow-privacy..."
+                    pip install --no-cache-dir --target /tmp/custom_packages tensorflow-privacy || echo "tensorflow-privacy installation failed"
+                    
                     # DO NOT install protobuf to custom directory - it conflicts with system TensorFlow
                     # Instead, rely on PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python environment variable
                     
