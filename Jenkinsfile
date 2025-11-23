@@ -137,21 +137,30 @@ spec:
                     echo "✓ Docker version: $(docker --version)"
                     echo "✓ Kubectl version: $(kubectl version --client)"
                     
-                    # Install TensorFlow Federated with compatibility fixes
-                    echo "📦 Installing TensorFlow Federated..."
+                    # Install TensorFlow Federated - CRITICAL for federated training
+                    echo "📦 Installing TensorFlow Federated (REQUIRED for federated training)..."
+                    echo "🔍 Python version: $(python --version)"
                     
-                    # Try different approaches for TFF installation
-                    if pip install --no-cache-dir tensorflow-federated==0.78.0; then
-                        echo "✓ TensorFlow Federated 0.78.0 installed successfully"
-                    elif pip install --no-cache-dir --no-build-isolation tensorflow-federated==0.78.0; then
-                        echo "✓ TensorFlow Federated installed with --no-build-isolation"
-                    elif pip install --no-cache-dir tensorflow-federated==0.77.0; then
-                        echo "✓ TensorFlow Federated 0.77.0 (older version) installed successfully"
+                    # Strategy 1: Try latest Python 3.13 compatible version
+                    if pip install --no-cache-dir tensorflow-federated==0.33.0; then
+                        echo "✓ TensorFlow Federated 0.33.0 installed (Python 3.13 compatible)"
+                    # Strategy 2: Force install newer version ignoring Python constraints
+                    elif PIP_DISABLE_PIP_VERSION_CHECK=1 pip install --no-cache-dir --force-reinstall --no-deps tensorflow-federated==0.78.0; then
+                        echo "✓ TensorFlow Federated 0.78.0 force-installed (ignoring Python version)"
+                        echo "⚠️  May have compatibility issues but should work for basic federated training"
+                    # Strategy 3: Try with --break-system-packages (if available)
+                    elif pip install --no-cache-dir --break-system-packages tensorflow-federated==0.78.0 2>/dev/null; then
+                        echo "✓ TensorFlow Federated 0.78.0 installed with --break-system-packages"
+                    # Strategy 4: Manual installation from wheel
+                    elif pip install --no-cache-dir --force-reinstall --no-build-isolation tensorflow-federated==0.33.0; then
+                        echo "✓ TensorFlow Federated 0.33.0 installed with --no-build-isolation"
                     else
-                        echo "⚠️  TensorFlow Federated installation failed with all methods"
-                        echo "⚠️  This is likely due to Python 3.13 compatibility issues"
-                        echo "⚠️  Federated training will use fallback implementation"
-                        echo "⚠️  Consider using Python 3.11 or 3.12 for better TFF compatibility"
+                        echo "❌ CRITICAL: All TensorFlow Federated installation methods failed"
+                        echo "❌ Federated training will NOT work without TFF"
+                        echo "💡 IMMEDIATE SOLUTION NEEDED:"
+                        echo "   1. Update Jenkins agent Docker image to use Python 3.11"
+                        echo "   2. Or modify federated_training.py to handle missing TFF gracefully"
+                        echo "   3. Current pipeline will continue but federated training stage will fail"
                     fi
                     
                     # Test critical imports
