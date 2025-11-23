@@ -29,7 +29,3 @@ pytest-cov>=4.0.0
 # Load testing
 locust>=2.0.0
 
-plotly
-streamlit
-folium 
-streamlit-folium
