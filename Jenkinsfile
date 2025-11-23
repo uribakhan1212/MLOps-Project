@@ -150,10 +150,15 @@ spec:
                     mkdir -p /tmp/custom_packages
                     export PYTHONPATH="/tmp/custom_packages:\$PYTHONPATH"
                     
+                    # Install TFF dependencies to custom directory first
+                    echo "🔧 Installing TFF dependencies to custom directory..."
+                    pip install --no-cache-dir --target /tmp/custom_packages attrs absl-py cachetools dm-tree farmhashpy grpcio || echo "Some dependencies failed"
+                    
                     # Try to install TFF to custom directory
                     if pip install --no-cache-dir --no-deps --target /tmp/custom_packages tensorflow-federated==0.33.0; then
                         echo "✅ SUCCESS: TensorFlow Federated 0.33.0 installed to custom directory"
                         echo "✅ Custom installation path: /tmp/custom_packages"
+                        echo "✅ Dependencies installed separately to same directory"
                     elif pip install --no-cache-dir --no-deps --target /tmp/custom_packages tensorflow-federated; then
                         echo "✅ SUCCESS: TensorFlow Federated (latest available) installed to custom directory"
                     else
