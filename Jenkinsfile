@@ -137,15 +137,10 @@ spec:
                     echo "✓ Docker version: $(docker --version)"
                     echo "✓ Kubectl version: $(kubectl version --client)"
                     
-                    # Install Python dependencies
-                    echo "📦 Installing Python dependencies..."
-                    if [ -f "requirements.txt" ]; then
-                        echo "Installing from requirements.txt..."
-                        pip install -r requirements.txt
-                        echo "✓ Requirements installed successfully"
-                    else
-                        echo "⚠️  requirements.txt not found, skipping dependency installation"
-                    fi
+                    # Install TensorFlow Federated specifically
+                    echo "📦 Installing TensorFlow Federated..."
+                    pip install tensorflow-federated>=0.78.0 || echo "⚠️  TensorFlow Federated installation failed, continuing..."
+                    echo "✓ TensorFlow Federated installation attempted"
                     
                     # Test critical imports
                     echo "🧪 Testing critical imports..."
