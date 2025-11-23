@@ -59,17 +59,18 @@ class TFFFederatedLearningOrchestrator:
         self.element_spec = any_dataset.element_spec
         self.input_dim = self.element_spec[0].shape[-1]
 
-        # TFF 0.87.0 requires optimizer instances, not factories
+        # TFF 0.87.0 uses TensorFlow Federated optimizers, not Keras optimizers
         print(f"🔧 Using TensorFlow Federated {tff.__version__}")
         
-        # Create optimizers directly for TFF 0.87.0+
-        client_optimizer = tf.keras.optimizers.Adam(learning_rate=self.client_learning_rate)
-        server_optimizer = tf.keras.optimizers.SGD(learning_rate=self.server_learning_rate, momentum=0.9)
-        
+        # Use TFF optimizer factories for compatibility
         self.training_process = tff.learning.algorithms.build_weighted_fed_avg(
             model_fn=self._model_fn,
-            client_optimizer_fn=client_optimizer,
-            server_optimizer_fn=server_optimizer,
+            client_optimizer_fn=tff.learning.optimizers.build_adam(
+                learning_rate=self.client_learning_rate
+            ),
+            server_optimizer_fn=tff.learning.optimizers.build_sgdm(
+                learning_rate=self.server_learning_rate, momentum=0.9
+            ),
         )
 
         print(
