@@ -140,33 +140,53 @@ spec:
                     # Install TensorFlow Federated - CRITICAL for federated training
                     echo "📦 Installing TensorFlow Federated (REQUIRED for federated training)..."
                     echo "🔍 Python version: $(python --version)"
+                    echo "⚠️  Python 3.13 has compatibility issues with TFF - using aggressive installation"
                     
-                    # Strategy 1: Try latest Python 3.13 compatible version
-                    if pip install --no-cache-dir tensorflow-federated==0.33.0; then
-                        echo "✓ TensorFlow Federated 0.33.0 installed (Python 3.13 compatible)"
-                    # Strategy 2: Force install newer version ignoring Python constraints
-                    elif PIP_DISABLE_PIP_VERSION_CHECK=1 pip install --no-cache-dir --force-reinstall --no-deps tensorflow-federated==0.78.0; then
-                        echo "✓ TensorFlow Federated 0.78.0 force-installed (ignoring Python version)"
-                        echo "⚠️  May have compatibility issues but should work for basic federated training"
-                    # Strategy 3: Try with --break-system-packages (if available)
-                    elif pip install --no-cache-dir --break-system-packages tensorflow-federated==0.78.0 2>/dev/null; then
-                        echo "✓ TensorFlow Federated 0.78.0 installed with --break-system-packages"
-                    # Strategy 4: Manual installation from wheel
-                    elif pip install --no-cache-dir --force-reinstall --no-build-isolation tensorflow-federated==0.33.0; then
-                        echo "✓ TensorFlow Federated 0.33.0 installed with --no-build-isolation"
+                    # AGGRESSIVE STRATEGY: Install TFF without any dependency checks
+                    echo "🔧 Attempting aggressive TFF installation..."
+                    
+                    # First install compatible dependencies manually
+                    pip install --no-cache-dir absl-py attrs cachetools dm-tree farmhashpy grpcio || echo "Some dependencies failed"
+                    
+                    # Force install TFF 0.78.0 without any checks
+                    if pip install --no-cache-dir --no-deps --force-reinstall --disable-pip-version-check tensorflow-federated==0.78.0; then
+                        echo "✅ SUCCESS: TensorFlow Federated 0.78.0 force-installed without dependencies"
+                        echo "⚠️  Dependencies installed separately - should work for federated training"
+                    # Fallback: Try older version without deps
+                    elif pip install --no-cache-dir --no-deps --force-reinstall tensorflow-federated==0.33.0; then
+                        echo "✅ SUCCESS: TensorFlow Federated 0.33.0 installed without dependencies"
+                        echo "⚠️  Using older version - basic federated training should work"
+                    # Last resort: Install any available version
+                    elif pip install --no-cache-dir --no-deps --force-reinstall tensorflow-federated; then
+                        echo "✅ SUCCESS: TensorFlow Federated (latest available) installed without dependencies"
                     else
                         echo "❌ CRITICAL: All TensorFlow Federated installation methods failed"
                         echo "❌ Federated training will NOT work without TFF"
-                        echo "💡 IMMEDIATE SOLUTION NEEDED:"
-                        echo "   1. Update Jenkins agent Docker image to use Python 3.11"
-                        echo "   2. Or modify federated_training.py to handle missing TFF gracefully"
-                        echo "   3. Current pipeline will continue but federated training stage will fail"
+                        echo "💡 SOLUTION: Create new Jenkins agent with Python 3.11:"
+                        echo "   FROM python:3.11-slim"
+                        echo "   # Then rebuild and push: docker build -t uribakhan/jenkins-agent-python:py311 ."
+                    fi
+                    
+                    # Test if TFF can be imported (basic functionality test)
+                    echo "🧪 Testing TensorFlow Federated import..."
+                    if python -c "import tensorflow_federated as tff; print(f'✅ TFF import successful: {tff.__version__}')"; then
+                        echo "✅ TensorFlow Federated is ready for federated training"
+                    else
+                        echo "❌ TensorFlow Federated import failed - federated training will not work"
                     fi
                     
                     # Test critical imports
                     echo "🧪 Testing critical imports..."
                     python -c "import tensorflow as tf; print(f'✓ TensorFlow version: {tf.__version__}')" || echo "⚠️  TensorFlow import failed"
-                    python -c "import tensorflow_federated as tff; print(f'✓ TensorFlow Federated version: {tff.__version__}')" || echo "⚠️  TensorFlow Federated import failed"
+                    
+                    # Test TFF with detailed error handling
+                    if python -c "import tensorflow_federated as tff; print(f'✓ TensorFlow Federated version: {tff.__version__}')"; then
+                        echo "✅ TensorFlow Federated is working - federated training enabled"
+                    else
+                        echo "❌ TensorFlow Federated import failed - federated training disabled"
+                        echo "💡 Pipeline will continue with fallback implementations"
+                    fi
+                    
                     python -c "import mlflow; print(f'✓ MLflow version: {mlflow.__version__}')" || echo "⚠️  MLflow import failed"
                     python -c "import pandas as pd; print(f'✓ Pandas version: {pd.__version__}')" || echo "⚠️  Pandas import failed"
                     python -c "import numpy as np; print(f'✓ NumPy version: {np.__version__}')" || echo "⚠️  NumPy import failed"
