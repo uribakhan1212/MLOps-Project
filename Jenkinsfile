@@ -780,9 +780,19 @@ EOF
                     def metrics = [:]
                     def driftResults = [:]
                     
+                    // Parse model metrics manually
                     try {
                         if (fileExists('model_metrics.json')) {
-                            metrics = readJSON file: 'model_metrics.json'
+                            def jsonContent = readFile('model_metrics.json')
+                            def accuracyMatch = jsonContent =~ /"final_avg_accuracy":\s*([0-9.]+)/
+                            def aucMatch = jsonContent =~ /"final_avg_auc":\s*([0-9.]+)/
+                            def lossMatch = jsonContent =~ /"final_avg_loss":\s*([0-9.]+)/
+                            
+                            metrics = [
+                                final_avg_accuracy: accuracyMatch ? accuracyMatch[0][1] as Double : 0.0,
+                                final_avg_auc: aucMatch ? aucMatch[0][1] as Double : 0.0,
+                                final_avg_loss: lossMatch ? lossMatch[0][1] as Double : 1.0
+                            ]
                         } else {
                             echo "⚠️  model_metrics.json not found, using defaults"
                             metrics = [final_avg_accuracy: 0.0, final_avg_auc: 0.0, final_avg_loss: 1.0]
@@ -792,9 +802,21 @@ EOF
                         metrics = [final_avg_accuracy: 0.0, final_avg_auc: 0.0, final_avg_loss: 1.0]
                     }
                     
+                    // Parse drift results manually
                     try {
                         if (fileExists('drift_results.json')) {
-                            driftResults = readJSON file: 'drift_results.json'
+                            def jsonContent = readFile('drift_results.json')
+                            def datasetDriftMatch = jsonContent =~ /"dataset_drift":\s*(true|false)/
+                            def driftedFeaturesMatch = jsonContent =~ /"drifted_features":\s*([0-9]+)/
+                            def totalFeaturesMatch = jsonContent =~ /"total_features":\s*([0-9]+)/
+                            def driftPercentageMatch = jsonContent =~ /"drift_percentage":\s*([0-9.]+)/
+                            
+                            driftResults = [
+                                dataset_drift: datasetDriftMatch ? datasetDriftMatch[0][1] == 'true' : false,
+                                drifted_features: driftedFeaturesMatch ? driftedFeaturesMatch[0][1] as Integer : 0,
+                                total_features: totalFeaturesMatch ? totalFeaturesMatch[0][1] as Integer : 0,
+                                drift_percentage: driftPercentageMatch ? driftPercentageMatch[0][1] as Double : 0.0
+                            ]
                         } else {
                             echo "⚠️  drift_results.json not found, using defaults"
                             driftResults = [dataset_drift: false, drifted_features: 0, total_features: 0, drift_percentage: 0.0]
@@ -876,7 +898,14 @@ Next Steps:
                 def metrics = [:]
                 try {
                     if (fileExists('model_metrics.json')) {
-                        metrics = readJSON file: 'model_metrics.json'
+                        def jsonContent = readFile('model_metrics.json')
+                        def accuracyMatch = jsonContent =~ /"final_avg_accuracy":\s*([0-9.]+)/
+                        def aucMatch = jsonContent =~ /"final_avg_auc":\s*([0-9.]+)/
+                        
+                        metrics = [
+                            final_avg_accuracy: accuracyMatch ? accuracyMatch[0][1] : 'N/A',
+                            final_avg_auc: aucMatch ? aucMatch[0][1] : 'N/A'
+                        ]
                     } else {
                         metrics = [final_avg_accuracy: 'N/A', final_avg_auc: 'N/A']
                     }
