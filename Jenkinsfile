@@ -149,10 +149,15 @@ spec:
                     echo "🔧 Creating custom Python package directory..."
                     mkdir -p /tmp/custom_packages
                     export PYTHONPATH="/tmp/custom_packages:\$PYTHONPATH"
+                    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
                     
                     # Install TFF dependencies to custom directory first
                     echo "🔧 Installing TFF dependencies to custom directory..."
                     pip install --no-cache-dir --target /tmp/custom_packages attrs absl-py cachetools dm-tree farmhashpy grpcio || echo "Some dependencies failed"
+                    
+                    # Install compatible protobuf version for TFF 0.33.0
+                    echo "🔧 Installing compatible protobuf version..."
+                    pip install --no-cache-dir --target /tmp/custom_packages "protobuf<=3.20.3" || echo "Protobuf installation failed"
                     
                     # Try to install TFF to custom directory
                     if pip install --no-cache-dir --no-deps --target /tmp/custom_packages tensorflow-federated==0.33.0; then
