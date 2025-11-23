@@ -136,9 +136,28 @@ spec:
                     echo "✓ Pip version: $(pip --version)"
                     echo "✓ Docker version: $(docker --version)"
                     echo "✓ Kubectl version: $(kubectl version --client)"
-                
                     
-                    echo "✅ Environment ready!"
+                    # Install Python dependencies
+                    echo "📦 Installing Python dependencies..."
+                    if [ -f "requirements.txt" ]; then
+                        echo "Installing from requirements.txt..."
+                        pip install -r requirements.txt
+                        echo "✓ Requirements installed successfully"
+                    else
+                        echo "⚠️  requirements.txt not found, skipping dependency installation"
+                    fi
+                    
+                    # Test critical imports
+                    echo "🧪 Testing critical imports..."
+                    python -c "import tensorflow as tf; print(f'✓ TensorFlow version: {tf.__version__}')" || echo "⚠️  TensorFlow import failed"
+                    python -c "import tensorflow_federated as tff; print(f'✓ TensorFlow Federated version: {tff.__version__}')" || echo "⚠️  TensorFlow Federated import failed"
+                    python -c "import mlflow; print(f'✓ MLflow version: {mlflow.__version__}')" || echo "⚠️  MLflow import failed"
+                    python -c "import pandas as pd; print(f'✓ Pandas version: {pd.__version__}')" || echo "⚠️  Pandas import failed"
+                    python -c "import numpy as np; print(f'✓ NumPy version: {np.__version__}')" || echo "⚠️  NumPy import failed"
+                    python -c "import sklearn; print(f'✓ Scikit-learn version: {sklearn.__version__}')" || echo "⚠️  Scikit-learn import failed"
+                    python -c "from scipy import stats; print('✓ SciPy imported successfully')" || echo "⚠️  SciPy import failed"
+                    
+                    echo "✅ Environment setup complete!"
                 '''
             }
         }
