@@ -193,66 +193,51 @@ spec:
                 script {
                     try {
                         // Debug: Check if file exists and show contents
-                        sh 'pwd && ls -la && ls -la drift_results.json || echo "drift_results.json not found"'
+                        sh 'pwd && ls -la drift_results.json || echo "drift_results.json not found"'
                         
-                        def driftResults = readJSON file: 'drift_results.json'
-                        
-                        echo "📊 Drift Detection Results:"
-                        echo "   Dataset drift: ${driftResults.dataset_drift}"
-                        echo "   Drifted features: ${driftResults.drifted_features}/${driftResults.total_features}"
-                        echo "   Drift percentage: ${driftResults.drift_percentage * 100}%"
-                        
-                        try{
-                            def driftThreshold = env.DRIFT_THRESHOLD as Double
-                        if (driftResults.drift_percentage > driftThreshold) {
-                            echo "⚠️  WARNING: Significant drift detected (${driftResults.drift_percentage * 100}% > ${driftThreshold * 100}%)"
-                            echo "   Model retraining recommended"
-                            // Store flag for later stages
-                            env.SIGNIFICANT_DRIFT = 'true'
-                        } else {
-                            echo "✅ Drift within acceptable limits"
-                            env.SIGNIFICANT_DRIFT = 'false'
-                        }
-                        
-                        }
-                        catch (Exception e){
-                            echo "Thresholding failed!!"
-                        }
-                        
-                    } catch (Exception e) {
-                        echo "⚠️  Warning: Could not parse drift results with readJSON: ${e.getMessage()}"
-                        echo "   Trying alternative approach..."
-                        
-                        try {
-                            // Alternative: read file content and parse manually
+                        if (fileExists('drift_results.json')) {
+                            echo "📄 File exists, reading drift results manually..."
+                            
+                            // Read file content manually instead of using readJSON
                             def jsonContent = readFile('drift_results.json')
-                            echo "Raw JSON content: ${jsonContent}"
+                            echo "📄 Raw drift results content: ${jsonContent}"
                             
-                            // Simple parsing for the key values we need
-                            def driftPercentage = 0.0
-                            if (jsonContent.contains('"drift_percentage":')) {
-                                def match = jsonContent =~ /"drift_percentage":\s*([0-9.]+)/
-                                if (match) {
-                                    driftPercentage = match[0][1] as Double
-                                }
-                            }
+                            // Manual JSON parsing using regex
+                            def datasetDriftMatch = jsonContent =~ /"dataset_drift":\s*(true|false)/
+                            def driftedFeaturesMatch = jsonContent =~ /"drifted_features":\s*([0-9]+)/
+                            def totalFeaturesMatch = jsonContent =~ /"total_features":\s*([0-9]+)/
+                            def driftPercentageMatch = jsonContent =~ /"drift_percentage":\s*([0-9.]+)/
                             
-                            echo "📊 Drift Detection Results (manual parsing):"
-                            echo "   Drift percentage: ${driftPercentage * 100}%"
+                            def driftResults = [
+                                dataset_drift: datasetDriftMatch ? datasetDriftMatch[0][1] == 'true' : false,
+                                drifted_features: driftedFeaturesMatch ? driftedFeaturesMatch[0][1] as Integer : 0,
+                                total_features: totalFeaturesMatch ? totalFeaturesMatch[0][1] as Integer : 0,
+                                drift_percentage: driftPercentageMatch ? driftPercentageMatch[0][1] as Double : 0.0
+                            ]
+                            echo "📄 Manual parsing successful!"
+                            
+                            echo "📊 Drift Detection Results:"
+                            echo "   Dataset drift: ${driftResults.dataset_drift}"
+                            echo "   Drifted features: ${driftResults.drifted_features}/${driftResults.total_features}"
+                            echo "   Drift percentage: ${driftResults.drift_percentage * 100}%"
                             
                             def driftThreshold = env.DRIFT_THRESHOLD as Double
-                            if (driftPercentage > driftThreshold) {
-                                echo "⚠️  WARNING: Significant drift detected (${driftPercentage * 100}% > ${driftThreshold * 100}%)"
+                            if (driftResults.drift_percentage > driftThreshold) {
+                                echo "⚠️  WARNING: Significant drift detected (${driftResults.drift_percentage * 100}% > ${driftThreshold * 100}%)"
+                                echo "   Model retraining recommended"
                                 env.SIGNIFICANT_DRIFT = 'true'
                             } else {
                                 echo "✅ Drift within acceptable limits"
                                 env.SIGNIFICANT_DRIFT = 'false'
                             }
-                        } catch (Exception e2) {
-                            echo "⚠️  Warning: Could not read drift results at all: ${e2.getMessage()}"
-                            echo "   Continuing with default values"
+                        } else {
+                            echo "⚠️  drift_results.json not found, using defaults"
                             env.SIGNIFICANT_DRIFT = 'false'
                         }
+                    } catch (Exception e) {
+                        echo "⚠️  Warning: Could not parse drift results: ${e.getMessage()}"
+                        echo "   Continuing with default values"
+                        env.SIGNIFICANT_DRIFT = 'false'
                     }
                 }
                 
@@ -533,11 +518,36 @@ EOF
                         // Check if image exists locally
                         sh "docker images | grep ${IMAGE_NAME} || echo 'Image not found locally'"
                         
-                        // Use Docker registry plugin properly
-                        docker.withRegistry('', DOCKER_CREDENTIAL_ID) {
-                            def dockerImage = docker.image("${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}")
-                            dockerImage.push("${IMAGE_TAG}")
-                            dockerImage.push("latest")
+                        // Test if credentials exist
+                        try {
+                            withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIAL_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                                echo "✅ Credentials found for user: ${DOCKER_USER}"
+                                
+                                // Try manual login first
+                                sh '''
+                                    echo "🔍 Attempting Docker login..."
+                                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                                    echo "✅ Docker login successful!"
+                                '''
+                                
+                                // Now try push
+                                sh """
+                                    echo "🔍 Pushing image manually..."
+                                    docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                                    docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:latest
+                                    echo "✅ Manual push successful!"
+                                """
+                            }
+                        } catch (Exception credError) {
+                            echo "❌ Credential error: ${credError.getMessage()}"
+                            echo "🔍 Trying Jenkins Docker plugin as fallback..."
+                            
+                            // Fallback to Jenkins Docker plugin
+                            docker.withRegistry('', DOCKER_CREDENTIAL_ID) {
+                                def dockerImage = docker.image("${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}")
+                                dockerImage.push("${IMAGE_TAG}")
+                                dockerImage.push("latest")
+                            }
                         }
                         echo "✅ Image pushed: ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
                     } catch (Exception e) {
