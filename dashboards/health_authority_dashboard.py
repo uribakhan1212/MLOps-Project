@@ -54,7 +54,7 @@ class DiabetesHealthDashboard:
     """Dashboard for health authorities to monitor diabetes risk in population"""
     
     def __init__(self):
-        self.mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:8082")
+        self.mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
         self.prometheus_uri = os.getenv("PROMETHEUS_URI", "http://localhost:9090")
         self.data_path = "federated_data"
         self.inference_data_file = os.path.join("dashboards", "data", "inference_data.json")

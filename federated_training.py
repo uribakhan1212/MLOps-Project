@@ -201,14 +201,34 @@ class TFFFederatedLearningOrchestrator:
         print("=" * 70)
 
         # Initialize robust MLflow client
-        mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:8082")
+        mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
         print(f"MLflow Tracking URI: {mlflow_uri}")
         
-        # Create robust MLflow client
+        # Validate MLflow URI format
+        if not mlflow_uri.startswith(('http://', 'https://', 'file://')):
+            print(f"⚠️ Warning: MLflow URI format may be invalid: {mlflow_uri}")
+        
+        # Test basic connectivity before creating client
+        print("🔍 Testing MLflow server connectivity...")
+        try:
+            import requests
+            if mlflow_uri.startswith('http'):
+                response = requests.get(f"{mlflow_uri}/health", timeout=5)
+                if response.status_code == 200:
+                    print("✅ MLflow server is responding")
+                else:
+                    print(f"⚠️ MLflow server returned status {response.status_code}")
+            else:
+                print("ℹ️ Non-HTTP URI detected, skipping connectivity test")
+        except Exception as e:
+            print(f"⚠️ MLflow server connectivity test failed: {e}")
+            print("   This may indicate MLflow server is not running or accessible")
+        
+        # Create robust MLflow client with increased retries
         mlflow_client = RobustMLflowClient(
             tracking_uri=mlflow_uri,
-            max_retries=3,
-            retry_delay=2.0
+            max_retries=5,        # Increased from 3 to 5 retries
+            retry_delay=3.0       # Increased from 2.0 to 3.0 seconds delay
         )
         
         # Setup experiment

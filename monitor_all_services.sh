@@ -31,9 +31,9 @@ echo "✓ Jenkins: http://localhost:8081"
 
 # Start MLflow port-forward
 echo "Starting MLflow..."
-kubectl port-forward -n $K8S_NAMESPACE svc/mlflow 8082:80 > /dev/null 2>&1 &
+kubectl port-forward -n $K8S_NAMESPACE svc/mlflow 5000:5000 > /dev/null 2>&1 &
 PF_MLFLOW=$!
-echo "✓ MLflow: http://localhost:8082"
+echo "✓ MLflow: http://localhost:5000"
 
 # Start Prometheus port-forward
 echo "Starting Prometheus..."
@@ -77,7 +77,7 @@ echo ""
 echo "📊 Access your services:"
 echo ""
 echo "  Jenkins:        http://localhost:8081"
-echo "  MLflow:         http://localhost:8082"
+echo "  MLflow:         http://localhost:5000"
 echo "  Prometheus:     http://localhost:9090"
 echo "  Grafana:        http://localhost:3000"
 echo "  Inference API:  http://localhost:5003"

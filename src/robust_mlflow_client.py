@@ -33,10 +33,12 @@ class RobustMLflowClient:
             logger.info("MLflow URI not set, running without MLflow")
             return
         
+        logger.info(f"🔗 Attempting to connect to MLflow at: {self.tracking_uri}")
         mlflow.set_tracking_uri(self.tracking_uri)
         
         for attempt in range(self.max_retries):
             try:
+                logger.info(f"🔄 Connection attempt {attempt + 1}/{self.max_retries}...")
                 self.client = mlflow.tracking.MlflowClient()
                 experiments = self.client.search_experiments()
                 logger.info(f"✅ MLflow connection successful, found {len(experiments)} experiments")
@@ -44,11 +46,30 @@ class RobustMLflowClient:
                 return
                 
             except Exception as e:
-                logger.warning(f"MLflow connection attempt {attempt + 1}/{self.max_retries} failed: {e}")
+                error_type = type(e).__name__
+                logger.warning(f"MLflow connection attempt {attempt + 1}/{self.max_retries} failed:")
+                logger.warning(f"   Error Type: {error_type}")
+                logger.warning(f"   Error Message: {str(e)}")
+                
+                # Provide specific guidance based on error type
+                if "Connection refused" in str(e) or "ConnectionError" in error_type:
+                    logger.warning("   💡 Suggestion: Check if MLflow server is running on the specified port")
+                elif "timeout" in str(e).lower():
+                    logger.warning("   💡 Suggestion: MLflow server may be slow to respond, consider increasing timeout")
+                elif "404" in str(e) or "Not Found" in str(e):
+                    logger.warning("   💡 Suggestion: Check if MLflow server URL is correct")
+                
                 if attempt < self.max_retries - 1:
+                    logger.info(f"   ⏳ Retrying in {self.retry_delay} seconds...")
                     time.sleep(self.retry_delay)
         
         logger.error("❌ Failed to connect to MLflow after all retries")
+        logger.error("   📋 Troubleshooting steps:")
+        logger.error("   1. Verify MLflow server is running: docker ps | grep mlflow")
+        logger.error("   2. Check port accessibility: curl http://localhost:5000/health")
+        logger.error("   3. Verify MLFLOW_TRACKING_URI environment variable")
+        logger.error("   4. Check firewall/network connectivity")
+        logger.error("   ℹ️ Training will continue with local fallback metrics")
         self.enabled = False
     
     def setup_experiment(self, experiment_name: str) -> Optional[str]:
