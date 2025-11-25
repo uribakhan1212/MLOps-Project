@@ -57,7 +57,7 @@ spec:
     }
     
     triggers {
-        pollSCM('H/5 * * * *')  // Poll SCM every 5 minutes for changes
+        pollSCM('H/2 * * * *')  // Poll SCM every 5 minutes for changes
     }
     
     environment {
