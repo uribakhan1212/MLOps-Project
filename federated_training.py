@@ -201,7 +201,8 @@ class TFFFederatedLearningOrchestrator:
         print("=" * 70)
 
         # Initialize robust MLflow client - using local MLflow server
-        mlflow_uri = "http://localhost:5000"
+        # Use environment variable from Jenkins, fallback to localhost for local runs
+        mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
         print(f"MLflow Tracking URI: {mlflow_uri}")
         
         # Set MLflow tracking URI explicitly

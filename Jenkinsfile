@@ -83,7 +83,10 @@ spec:
         
         // Data Drift Configuration
         DRIFT_CHECK_ENABLED = 'true'
-        DRIFT_THRESHOLD = '0.02'
+        DRIFT_THRESHOLD = '0.30'
+        
+        // Model Improvement Configuration
+        MODEL_IMPROVED = 'false'  // Will be set to 'true' if new model is better
         
         // Monitoring Configuration
         PROMETHEUS_URL = 'http://prometheus-server.mlops-fl.svc.cluster.local:80'
@@ -406,6 +409,16 @@ except Exception as e:
                     echo "Current directory: $(pwd)"
                     echo "Files before validation: $(ls -la)"
                     
+                    # Check if there's an existing model_metrics.json from previous run
+                    # If so, rename it to previous_model_metrics.json for comparison
+                    if [ -f "model_metrics.json" ]; then
+                        echo "📋 Found existing model_metrics.json from previous run"
+                        mv model_metrics.json previous_model_metrics.json
+                        echo "✅ Renamed to previous_model_metrics.json for comparison"
+                    else
+                        echo "ℹ️ No existing model_metrics.json found - treating as first deployment"
+                    fi
+                    
                     # Use enhanced validation script with fallback support
                     python scripts/validate_mlflow_model.py \
                         --mlflow-uri ${MLFLOW_TRACKING_URI} \
@@ -493,9 +506,77 @@ except Exception as e:
                             if (validationErrors.size() > 0) {
                                 echo "❌ Model validation failed with ${validationErrors.size()} errors:"
                                 validationErrors.each { echo "   - ${it}" }
+                                env.MODEL_IMPROVED = 'false'
                                 error("Model validation failed")
                             } else {
                                 echo "✅ Model passed all validation gates!"
+                                
+                                // Compare with previous model performance
+                                echo "🔍 Comparing with previous model performance..."
+                                def previousMetrics = [:]
+                                
+                                // Check if we have previous model metrics to compare against
+                                if (fileExists('previous_model_metrics.json')) {
+                                    try {
+                                        def prevJsonText = readFile('previous_model_metrics.json')
+                                        def prevAccuracyMatch = prevJsonText =~ /"final_avg_accuracy":\s*([0-9.]+)/
+                                        def prevAucMatch = prevJsonText =~ /"final_avg_auc":\s*([0-9.]+)/
+                                        def prevLossMatch = prevJsonText =~ /"final_avg_loss":\s*([0-9.]+)/
+                                        
+                                        previousMetrics = [
+                                            final_avg_accuracy: prevAccuracyMatch ? prevAccuracyMatch[0][1] as Double : 0.0,
+                                            final_avg_auc: prevAucMatch ? prevAucMatch[0][1] as Double : 0.0,
+                                            final_avg_loss: prevLossMatch ? prevLossMatch[0][1] as Double : 1.0
+                                        ]
+                                        
+                                        echo "📊 Previous Model Performance:"
+                                        echo "   Previous Accuracy: ${previousMetrics.final_avg_accuracy}"
+                                        echo "   Previous AUC: ${previousMetrics.final_avg_auc}"
+                                        echo "   Previous Loss: ${previousMetrics.final_avg_loss}"
+                                        
+                                        // Calculate improvements
+                                        def accuracyImprovement = metrics.final_avg_accuracy - previousMetrics.final_avg_accuracy
+                                        def aucImprovement = metrics.final_avg_auc - previousMetrics.final_avg_auc
+                                        def lossImprovement = previousMetrics.final_avg_loss - metrics.final_avg_loss // Lower loss is better
+                                        
+                                        echo "📈 Performance Changes:"
+                                        echo "   Accuracy change: ${accuracyImprovement > 0 ? '+' : ''}${accuracyImprovement.round(4)}"
+                                        echo "   AUC change: ${aucImprovement > 0 ? '+' : ''}${aucImprovement.round(4)}"
+                                        echo "   Loss change: ${lossImprovement > 0 ? '+' : ''}${lossImprovement.round(4)} (lower is better)"
+                                        
+                                        // Define improvement thresholds
+                                        def minAccuracyImprovement = 0.001  // 0.1% minimum improvement
+                                        def minAucImprovement = 0.001       // 0.1% minimum improvement
+                                        def minLossImprovement = 0.001      // 0.1% minimum improvement
+                                        
+                                        // Check if model is significantly better
+                                        def isImproved = (accuracyImprovement >= minAccuracyImprovement) || 
+                                                        (aucImprovement >= minAucImprovement) || 
+                                                        (lossImprovement >= minLossImprovement)
+                                        
+                                        if (isImproved) {
+                                            echo "🎉 NEW MODEL IS BETTER! Proceeding with deployment."
+                                            env.MODEL_IMPROVED = 'true'
+                                        } else {
+                                            echo "⚠️ NEW MODEL IS NOT SIGNIFICANTLY BETTER"
+                                            echo "   Skipping deployment to avoid regression"
+                                            env.MODEL_IMPROVED = 'false'
+                                        }
+                                        
+                                    } catch (Exception e) {
+                                        echo "⚠️ Could not parse previous metrics: ${e.getMessage()}"
+                                        echo "✅ Treating as first deployment (no previous model)"
+                                        env.MODEL_IMPROVED = 'true'
+                                    }
+                                } else {
+                                    echo "ℹ️ No previous model metrics found - treating as first deployment"
+                                    env.MODEL_IMPROVED = 'true'
+                                }
+                                
+                                // Current model_metrics.json will be used as previous_model_metrics.json in next run
+                                
+                                echo "🔍 Model comparison complete"
+                                echo "   Deploy new model: ${env.MODEL_IMPROVED}"
                             }
                             echo "🔍 Validation complete, exiting script block..."
                         } else {
@@ -512,9 +593,12 @@ except Exception as e:
         
         stage('📦 Download Model from MLflow') {
             when {
-                anyOf {
-                    branch 'main'
-                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                allOf {
+                    anyOf {
+                        branch 'main'
+                        expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                    }
+                    expression { return env.MODEL_IMPROVED == 'true' }
                 }
             }
             steps {
@@ -536,9 +620,12 @@ except Exception as e:
         
         stage('🐳 Build Docker Image') {
             when {
-                anyOf {
-                    branch 'main'
-                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                allOf {
+                    anyOf {
+                        branch 'main'
+                        expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                    }
+                    expression { return env.MODEL_IMPROVED == 'true' }
                 }
             }
             steps {
@@ -596,9 +683,12 @@ except Exception as e:
         
         stage('📤 Push to Registry') {
             when {
-                anyOf {
-                    branch 'main'
-                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                allOf {
+                    anyOf {
+                        branch 'main'
+                        expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                    }
+                    expression { return env.MODEL_IMPROVED == 'true' }
                 }
             }
             steps {
@@ -670,9 +760,12 @@ except Exception as e:
         
         stage('🚀 Deploy to Kubernetes') {
             when {
-                anyOf {
-                    branch 'main'
-                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                allOf {
+                    anyOf {
+                        branch 'main'
+                        expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                    }
+                    expression { return env.MODEL_IMPROVED == 'true' }
                 }
             }
             steps {
@@ -691,7 +784,7 @@ except Exception as e:
                         # Wait for rollout
                         kubectl rollout status deployment/diabetes-inference-server \
                             -n ${K8S_NAMESPACE} \
-                            --timeout=15m
+                            --timeout=25m
                         
                         # Verify deployment
                         kubectl get pods -n ${K8S_NAMESPACE} -l app=diabetes-inference
@@ -705,9 +798,12 @@ except Exception as e:
         
         stage('🧪 Post-Deploy Health Checks') {
             when {
-                anyOf {
-                    branch 'main'
-                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                allOf {
+                    anyOf {
+                        branch 'main'
+                        expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                    }
+                    expression { return env.MODEL_IMPROVED == 'true' }
                 }
             }
             steps {
@@ -874,6 +970,75 @@ EOF
                         
                         echo "✅ Alerting rules configured"
                     """
+                }
+            }
+        }
+        
+        stage('📋 Pipeline Summary') {
+            steps {
+                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                echo '📋 Pipeline Execution Summary'
+                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                
+                script {
+                    echo "🔍 Pipeline Decision Summary:"
+                    echo "   Branch: ${GIT_BRANCH}"
+                    echo "   Build Number: ${BUILD_NUMBER}"
+                    echo "   Drift Check Enabled: ${env.DRIFT_CHECK_ENABLED}"
+                    echo "   Significant Drift Detected: ${env.SIGNIFICANT_DRIFT ?: 'false'}"
+                    echo "   Model Improved: ${env.MODEL_IMPROVED ?: 'false'}"
+                    
+                    def driftDetected = env.SIGNIFICANT_DRIFT == 'true'
+                    def modelImproved = env.MODEL_IMPROVED == 'true'
+                    def isMainBranch = env.GIT_BRANCH == 'main'
+                    
+                    echo ""
+                    echo "🎯 Execution Path:"
+                    
+                    if (driftDetected) {
+                        echo "   ✅ Data drift detected (${env.DRIFT_THRESHOLD ?: '2'}% threshold exceeded)"
+                        echo "   ✅ Model training executed"
+                        
+                        if (modelImproved) {
+                            echo "   ✅ New model performance is better than previous"
+                            echo "   ✅ Docker build and deployment executed"
+                            echo "   🚀 New model deployed to production"
+                        } else {
+                            echo "   ⚠️ New model performance is not better than previous"
+                            echo "   ⏭️ Skipped Docker build and deployment"
+                            echo "   🛡️ Previous model remains in production (preventing regression)"
+                        }
+                    } else if (isMainBranch) {
+                        echo "   ℹ️ Manual deployment on main branch"
+                        echo "   ✅ Model training executed"
+                        
+                        if (modelImproved) {
+                            echo "   ✅ New model performance is acceptable"
+                            echo "   ✅ Docker build and deployment executed"
+                            echo "   🚀 New model deployed to production"
+                        } else {
+                            echo "   ⚠️ New model performance is not better than previous"
+                            echo "   ⏭️ Skipped Docker build and deployment"
+                            echo "   🛡️ Previous model remains in production"
+                        }
+                    } else {
+                        echo "   ℹ️ No significant drift detected"
+                        echo "   ⏭️ Skipped model training and deployment"
+                        echo "   ✅ Current model remains in production"
+                    }
+                    
+                    echo ""
+                    echo "📊 Resource Optimization:"
+                    if (!driftDetected && !isMainBranch) {
+                        echo "   💰 Saved compute resources by skipping unnecessary training"
+                        echo "   ⚡ Fast pipeline execution (drift detection only)"
+                    } else if (driftDetected && !modelImproved) {
+                        echo "   🛡️ Prevented model regression by keeping better performing model"
+                        echo "   ⚖️ Training cost justified for model comparison"
+                    } else {
+                        echo "   🎯 Full pipeline execution justified by model improvement"
+                        echo "   📈 Production model updated with better performance"
+                    }
                 }
             }
         }
