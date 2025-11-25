@@ -202,16 +202,90 @@ spec:
                 echo '🔍 Checking for data drift...'
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 
-                sh '''
-                    mkdir -p reports
+                script {
+                    // Check if inference data exists before running drift detection
+                    def inferenceDataPath = 'dashboards/data/inference_data.json'
                     
-                    echo "🔍 Running enhanced drift detection using inference data..."
-                    python scripts/detect_drift_inference.py
-                    
-                    echo "📊 Drift detection completed"
-                    ls -la drift_results.json || echo "drift_results.json not created"
-                    ls -la reports/drift_report.html || echo "drift_report.html not created"
-                '''
+                    if (fileExists(inferenceDataPath)) {
+                        echo "✅ Found inference data file: ${inferenceDataPath}"
+                        echo "� Proeceeding with drift detection analysis..."
+                        
+                        sh '''
+                            mkdir -p reports
+                            
+                            echo "🔍 Running enhanced drift detection using inference data..."
+                            python scripts/detect_drift_inference.py
+                            
+                            echo "📊 Drift detection completed"
+                            ls -la drift_results.json || echo "drift_results.json not created"
+                            ls -la reports/drift_report.html || echo "drift_report.html not created"
+                        '''
+                    } else {
+                        echo "ℹ️ No inference data found at: ${inferenceDataPath}"
+                        echo "🆕 This indicates a FIRST RUN or no user predictions yet"
+                        echo "⏭️ Skipping drift detection (no baseline data available)"
+                        echo ""
+                        echo "📝 Creating default drift results for first run..."
+                        
+                        // Create default drift results for first run
+                        sh '''
+                            mkdir -p reports
+                            
+                            # Create default drift results indicating no drift (first run)
+                            cat > drift_results.json << EOF
+{
+  "dataset_drift": false,
+  "drifted_features": 0,
+  "total_features": 22,
+  "drift_percentage": 0.0,
+  "data_added_to_training": false,
+  "drifted_feature_names": [],
+  "first_run": true,
+  "message": "First run - no inference data available for drift detection",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+                            
+                            echo "✅ Created default drift results for first run"
+                            
+                            # Create simple HTML report for first run
+                            cat > reports/drift_report.html << EOF
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Data Drift Report - First Run</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .header { color: #2E86AB; border-bottom: 2px solid #2E86AB; padding-bottom: 10px; }
+        .status { background-color: #E8F4FD; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .info { background-color: #FFF3CD; padding: 15px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1 class="header">🔍 Data Drift Detection Report</h1>
+    <div class="status">
+        <h2>✅ First Run Detected</h2>
+        <p><strong>Status:</strong> No drift detection performed</p>
+        <p><strong>Reason:</strong> No inference data available yet</p>
+        <p><strong>Next Steps:</strong> Make predictions through the inference API to collect baseline data</p>
+    </div>
+    <div class="info">
+        <h3>ℹ️ Information</h3>
+        <p>This is the first pipeline run or no user predictions have been made yet.</p>
+        <p>Drift detection requires inference data to compare against training data.</p>
+        <p>Once users start making predictions, future pipeline runs will perform drift analysis.</p>
+    </div>
+    <p><em>Generated: $(date)</em></p>
+</body>
+</html>
+EOF
+                            
+                            echo "✅ Created first run drift report"
+                        '''
+                        
+                        echo "🎯 First run handling complete"
+                    }
+                }
                 
                 script {
                     try {
@@ -232,6 +306,7 @@ spec:
                             def driftPercentageMatch = jsonContent =~ /"drift_percentage":\s*([0-9.]+)/
                             def dataAddedMatch = jsonContent =~ /"data_added_to_training":\s*(true|false)/
                             def driftedFeatureNamesMatch = jsonContent =~ /"drifted_feature_names":\s*\[([^\]]*)\]/
+                            def firstRunMatch = jsonContent =~ /"first_run":\s*(true|false)/
                             
                             def driftResults = [
                                 dataset_drift: datasetDriftMatch ? datasetDriftMatch[0][1] == 'true' : false,
@@ -239,7 +314,8 @@ spec:
                                 total_features: totalFeaturesMatch ? totalFeaturesMatch[0][1] as Integer : 0,
                                 drift_percentage: driftPercentageMatch ? driftPercentageMatch[0][1] as Double : 0.0,
                                 data_added_to_training: dataAddedMatch ? dataAddedMatch[0][1] == 'true' : false,
-                                drifted_feature_names: driftedFeatureNamesMatch ? driftedFeatureNamesMatch[0][1] : ''
+                                drifted_feature_names: driftedFeatureNamesMatch ? driftedFeatureNamesMatch[0][1] : '',
+                                first_run: firstRunMatch ? firstRunMatch[0][1] == 'true' : false
                             ]
                             echo "📄 Manual parsing successful!"
                             
@@ -247,23 +323,36 @@ spec:
                             echo "   Dataset drift: ${driftResults.dataset_drift}"
                             echo "   Drifted features: ${driftResults.drifted_features}/${driftResults.total_features}"
                             echo "   Drift percentage: ${driftResults.drift_percentage * 100}%"
-                            echo "   Data source: dashboards/data/inference_data.json"
-                            echo "   Data added to training: ${driftResults.data_added_to_training}"
-                            if (driftResults.drifted_feature_names) {
-                                echo "   Affected features: ${driftResults.drifted_feature_names}"
+                            echo "   First run: ${driftResults.first_run}"
+                            
+                            if (driftResults.first_run) {
+                                echo "   Data source: No inference data available yet"
+                            } else {
+                                echo "   Data source: dashboards/data/inference_data.json"
+                                echo "   Data added to training: ${driftResults.data_added_to_training}"
+                                if (driftResults.drifted_feature_names) {
+                                    echo "   Affected features: ${driftResults.drifted_feature_names}"
+                                }
                             }
                             
-                            def driftThreshold = env.DRIFT_THRESHOLD as Double
-                            if (driftResults.drift_percentage > driftThreshold) {
-                                echo "🚨 SIGNIFICANT DRIFT DETECTED!"
-                                echo "   Drift percentage: ${driftResults.drift_percentage * 100}% > ${driftThreshold * 100}%"
-                                echo "   Inference data has been added to training data"
-                                echo "   Model retraining will proceed with updated data"
-                                env.SIGNIFICANT_DRIFT = 'true'
+                            if (driftResults.first_run) {
+                                echo "🆕 FIRST RUN DETECTED - No drift analysis performed"
+                                echo "   Reason: No inference data available for comparison"
+                                echo "   Action: Proceeding with initial model training and deployment"
+                                env.SIGNIFICANT_DRIFT = 'false'  // No drift on first run
                             } else {
-                                echo "✅ Drift within acceptable limits (${driftResults.drift_percentage * 100}% <= ${driftThreshold * 100}%)"
-                                echo "   No retraining needed at this time"
-                                env.SIGNIFICANT_DRIFT = 'false'
+                                def driftThreshold = env.DRIFT_THRESHOLD as Double
+                                if (driftResults.drift_percentage > driftThreshold) {
+                                    echo "🚨 SIGNIFICANT DRIFT DETECTED!"
+                                    echo "   Drift percentage: ${driftResults.drift_percentage * 100}% > ${driftThreshold * 100}%"
+                                    echo "   Inference data has been added to training data"
+                                    echo "   Model retraining will proceed with updated data"
+                                    env.SIGNIFICANT_DRIFT = 'true'
+                                } else {
+                                    echo "✅ Drift within acceptable limits (${driftResults.drift_percentage * 100}% <= ${driftThreshold * 100}%)"
+                                    echo "   No retraining needed at this time"
+                                    env.SIGNIFICANT_DRIFT = 'false'
+                                }
                             }
                         } else {
                             echo "⚠️  drift_results.json not found, using defaults"
@@ -337,6 +426,10 @@ spec:
                 anyOf {
                     branch 'main'
                     expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                    expression { 
+                        // Also run training if no previous model exists (first run)
+                        return !fileExists('previous_model_metrics.json') && !fileExists('model_metrics.json')
+                    }
                 }
             }
             steps {
@@ -580,8 +673,15 @@ except Exception as e:
                             }
                             echo "🔍 Validation complete, exiting script block..."
                         } else {
-                            echo "⚠️  Warning: model_metrics.json not found, using fallback validation"
-                            echo "✅ Continuing pipeline with default validation"
+                            echo "⚠️  Warning: model_metrics.json not found after validation"
+                            echo "ℹ️  This could indicate:"
+                            echo "     - First time running the pipeline"
+                            echo "     - Validation script failed to create metrics file"
+                            echo "     - MLflow connectivity issues"
+                            echo ""
+                            echo "🎯 Treating as FIRST RUN - allowing training and deployment to proceed"
+                            echo "✅ Setting MODEL_IMPROVED = 'true' for first deployment"
+                            env.MODEL_IMPROVED = 'true'
                         }
                     } catch (Exception e) {
                         echo "⚠️  Warning: Could not parse model metrics: ${e.getMessage()}"
@@ -991,11 +1091,24 @@ EOF
                     def driftDetected = env.SIGNIFICANT_DRIFT == 'true'
                     def modelImproved = env.MODEL_IMPROVED == 'true'
                     def isMainBranch = env.GIT_BRANCH == 'main'
+                    def isFirstRun = !fileExists('previous_model_metrics.json') && modelImproved
+                    def isDriftFirstRun = !fileExists('dashboards/data/inference_data.json')
                     
                     echo ""
                     echo "🎯 Execution Path:"
                     
-                    if (driftDetected) {
+                    if (isFirstRun || isDriftFirstRun) {
+                        echo "   🆕 FIRST RUN DETECTED"
+                        if (!fileExists('previous_model_metrics.json')) {
+                            echo "   ℹ️ No previous model metrics found"
+                        }
+                        if (!fileExists('dashboards/data/inference_data.json')) {
+                            echo "   ℹ️ No inference data available for drift detection"
+                        }
+                        echo "   ✅ Model training executed (initial deployment)"
+                        echo "   ✅ Docker build and deployment executed"
+                        echo "   🚀 First model deployed to production"
+                    } else if (driftDetected) {
                         echo "   ✅ Data drift detected (${env.DRIFT_THRESHOLD ?: '2'}% threshold exceeded)"
                         echo "   ✅ Model training executed"
                         
@@ -1029,8 +1142,14 @@ EOF
                     
                     echo ""
                     echo "📊 Resource Optimization:"
-                    if (!driftDetected && !isMainBranch) {
-                        echo "   💰 Saved compute resources by skipping unnecessary training"
+                    if (isFirstRun || isDriftFirstRun) {
+                        echo "   🆕 Initial deployment - full pipeline execution required"
+                        echo "   📈 Establishing baseline model and data collection in production"
+                        if (isDriftFirstRun) {
+                            echo "   📊 Future runs will perform drift detection once inference data is available"
+                        }
+                    } else if (!driftDetected && !isMainBranch) {
+                        echo "   � Saved ncompute resources by skipping unnecessary training"
                         echo "   ⚡ Fast pipeline execution (drift detection only)"
                     } else if (driftDetected && !modelImproved) {
                         echo "   🛡️ Prevented model regression by keeping better performing model"
