@@ -1701,15 +1701,107 @@
         "education": 4.0,
         "income": 5.0
       }
+    },
+    {
+      "id": "9793121e-a6ce-4584-86b7-d3724ba96879",
+      "timestamp": "2025-11-25T21:03:56.514234",
+      "features": {
+        "HighBP": 1.0,
+        "HighChol": 1.0,
+        "BMI": 25.0,
+        "GenHlth": 0.0,
+        "Age": 0.0,
+        "Smoker": 0.0,
+        "Stroke": 0.0,
+        "HeartDiseaseorAttack": 0.0,
+        "PhysActivity": 0.0,
+        "DiffWalk": 0.0,
+        "Sex": 0.0,
+        "MentHlth": 0.0,
+        "PhysHlth": 0.0,
+        "CholCheck": 0.0,
+        "Fruits": 0.0,
+        "Veggies": 0.0,
+        "HvyAlcoholConsump": 0.0,
+        "AnyHealthcare": 0.0,
+        "NoDocbcCost": 0.0,
+        "Education": 4.0,
+        "Income": 5.0
+      },
+      "prediction": {
+        "diabetes_probability": 0.14776930212974548,
+        "risk_level": "LOW",
+        "threshold": 0.5
+      },
+      "risk_factors": {
+        "high_bp": 1.0,
+        "high_chol": 1.0,
+        "bmi": 25.0,
+        "smoker": 0.0,
+        "age_group": 0.0,
+        "general_health": 0.0
+      },
+      "demographics": {
+        "sex": 0.0,
+        "age_group": 0.0,
+        "education": 4.0,
+        "income": 5.0
+      }
+    },
+    {
+      "id": "709e70ce-720e-43f9-b4bf-9e05e19098d1",
+      "timestamp": "2025-11-25T21:04:10.056884",
+      "features": {
+        "HighBP": 1.0,
+        "HighChol": 1.0,
+        "BMI": 18.0,
+        "GenHlth": 3.0,
+        "Age": 7.0,
+        "Smoker": 0.0,
+        "Stroke": 0.0,
+        "HeartDiseaseorAttack": 0.0,
+        "PhysActivity": 0.0,
+        "DiffWalk": 1.0,
+        "Sex": 0.0,
+        "MentHlth": 0.0,
+        "PhysHlth": 0.0,
+        "CholCheck": 0.0,
+        "Fruits": 0.0,
+        "Veggies": 0.0,
+        "HvyAlcoholConsump": 0.0,
+        "AnyHealthcare": 0.0,
+        "NoDocbcCost": 0.0,
+        "Education": 4.0,
+        "Income": 5.0
+      },
+      "prediction": {
+        "diabetes_probability": 0.68964684009552,
+        "risk_level": "HIGH",
+        "threshold": 0.5
+      },
+      "risk_factors": {
+        "high_bp": 1.0,
+        "high_chol": 1.0,
+        "bmi": 18.0,
+        "smoker": 0.0,
+        "age_group": 7.0,
+        "general_health": 3.0
+      },
+      "demographics": {
+        "sex": 0.0,
+        "age_group": 7.0,
+        "education": 4.0,
+        "income": 5.0
+      }
     }
   ],
   "metadata": {
-    "total_predictions": 37,
-    "high_risk_count": 9,
-    "low_risk_count": 28,
-    "last_updated": "2025-11-25T21:01:12.102834",
+    "total_predictions": 39,
+    "high_risk_count": 10,
+    "low_risk_count": 29,
+    "last_updated": "2025-11-25T21:04:10.056936",
     "created": "2025-11-23T00:00:00Z",
-    "predictions_since_last_push": 0,
+    "predictions_since_last_push": 2,
     "last_github_push": "2025-11-25T21:01:32.890756"
   }
 }
