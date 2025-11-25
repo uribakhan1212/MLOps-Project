@@ -697,6 +697,10 @@ except Exception as e:
                     anyOf {
                         branch 'main'
                         expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                        expression { 
+                            // Also run for first deployment (no previous model)
+                            return !fileExists('previous_model_metrics.json') || !fileExists('dashboards/data/inference_data.json')
+                        }
                     }
                     expression { return env.MODEL_IMPROVED == 'true' }
                 }
@@ -724,6 +728,10 @@ except Exception as e:
                     anyOf {
                         branch 'main'
                         expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                        expression { 
+                            // Also run for first deployment (no previous model)
+                            return !fileExists('previous_model_metrics.json') || !fileExists('dashboards/data/inference_data.json')
+                        }
                     }
                     expression { return env.MODEL_IMPROVED == 'true' }
                 }
@@ -787,6 +795,10 @@ except Exception as e:
                     anyOf {
                         branch 'main'
                         expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                        expression { 
+                            // Also run for first deployment (no previous model)
+                            return !fileExists('previous_model_metrics.json') || !fileExists('dashboards/data/inference_data.json')
+                        }
                     }
                     expression { return env.MODEL_IMPROVED == 'true' }
                 }
@@ -864,6 +876,10 @@ except Exception as e:
                     anyOf {
                         branch 'main'
                         expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                        expression { 
+                            // Also run for first deployment (no previous model)
+                            return !fileExists('previous_model_metrics.json') || !fileExists('dashboards/data/inference_data.json')
+                        }
                     }
                     expression { return env.MODEL_IMPROVED == 'true' }
                 }
@@ -902,6 +918,10 @@ except Exception as e:
                     anyOf {
                         branch 'main'
                         expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                        expression { 
+                            // Also run for first deployment (no previous model)
+                            return !fileExists('previous_model_metrics.json') || !fileExists('dashboards/data/inference_data.json')
+                        }
                     }
                     expression { return env.MODEL_IMPROVED == 'true' }
                 }
