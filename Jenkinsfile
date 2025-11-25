@@ -691,7 +691,7 @@ except Exception as e:
                         # Wait for rollout
                         kubectl rollout status deployment/diabetes-inference-server \
                             -n ${K8S_NAMESPACE} \
-                            --timeout=5m
+                            --timeout=15m
                         
                         # Verify deployment
                         kubectl get pods -n ${K8S_NAMESPACE} -l app=diabetes-inference
