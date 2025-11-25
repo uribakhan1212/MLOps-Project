@@ -200,9 +200,12 @@ class TFFFederatedLearningOrchestrator:
         print("🚀 STARTING TFF FEDERATED LEARNING")
         print("=" * 70)
 
-        # Initialize robust MLflow client
-        mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+        # Initialize robust MLflow client - using local MLflow server
+        mlflow_uri = "http://localhost:5000"
         print(f"MLflow Tracking URI: {mlflow_uri}")
+        
+        # Set MLflow tracking URI explicitly
+        mlflow.set_tracking_uri(mlflow_uri)
         
         # Validate MLflow URI format
         if not mlflow_uri.startswith(('http://', 'https://', 'file://')):

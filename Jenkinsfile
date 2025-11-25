@@ -71,8 +71,8 @@ spec:
         K8S_NAMESPACE = 'mlops-fl'
         // Using ServiceAccount - no credentials needed
         
-        // MLflow Configuration - Kubernetes service (fallback to local)
-        MLFLOW_TRACKING_URI = "${env.MLFLOW_URI ?: 'http://mlflow.mlops-fl.svc.cluster.local:5000'}"
+        // MLflow Configuration - Local server via Docker host
+        MLFLOW_TRACKING_URI = 'http://host.docker.internal:5000'
         MLFLOW_EXPERIMENT_NAME = 'diabetes-federated-learning'
         MODEL_NAME = 'diabetes-federated-model'
         
@@ -389,6 +389,12 @@ except Exception as e:
         }
         
         stage('✅ Validate Model from MLflow') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                }
+            }
             steps {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 echo '✅ Validating model performance...'
@@ -505,6 +511,12 @@ except Exception as e:
         }
         
         stage('📦 Download Model from MLflow') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                }
+            }
             steps {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 echo '📦 Downloading model from MLflow...'
@@ -523,6 +535,12 @@ except Exception as e:
         }
         
         stage('🐳 Build Docker Image') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                }
+            }
             steps {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 echo '🐳 Building Docker image...'
@@ -577,6 +595,12 @@ except Exception as e:
         // }
         
         stage('📤 Push to Registry') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                }
+            }
             steps {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 echo '📤 Pushing image to Docker registry...'
@@ -646,7 +670,10 @@ except Exception as e:
         
         stage('🚀 Deploy to Kubernetes') {
             when {
-                branch 'main'
+                anyOf {
+                    branch 'main'
+                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                }
             }
             steps {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
@@ -677,6 +704,12 @@ except Exception as e:
         }
         
         stage('🧪 Post-Deploy Health Checks') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { return env.SIGNIFICANT_DRIFT == 'true' }
+                }
+            }
             steps {
                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                 echo '🧪 Running post-deployment health checks...'

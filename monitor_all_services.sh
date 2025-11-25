@@ -29,11 +29,11 @@ kubectl port-forward -n $K8S_NAMESPACE svc/jenkins 8081:8080 > /dev/null 2>&1 &
 PF_JENKINS=$!
 echo "✓ Jenkins: http://localhost:8081"
 
-# Start MLflow port-forward
-echo "Starting MLflow..."
-kubectl port-forward -n $K8S_NAMESPACE svc/mlflow 5000:5000 > /dev/null 2>&1 &
+# Start local MLflow server
+echo "Starting local MLflow server..."
+mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns > /dev/null 2>&1 &
 PF_MLFLOW=$!
-echo "✓ MLflow: http://localhost:5000"
+echo "✓ MLflow (Local): http://localhost:5000"
 
 # Start Prometheus port-forward
 echo "Starting Prometheus..."
@@ -91,11 +91,12 @@ echo "   - Watch build progress in real-time"
 echo "   - View console output for each stage"
 echo "   - Monitor stage transitions"
 echo ""
-echo "2. MLflow (Training Metrics):"
+echo "2. MLflow (Local Training Metrics):"
 echo "   - Go to: Experiments → diabetes-federated-learning"
 echo "   - Watch runs appear during training"
 echo "   - See metrics update per round"
 echo "   - Check Model Registry for new versions"
+echo "   - Local SQLite database: mlflow.db"
 echo ""
 echo "3. Prometheus (Metrics Collection):"
 echo "   - Go to: Status → Targets"
@@ -142,13 +143,13 @@ echo ""
 # Cleanup on exit
 cleanup() {
     echo ""
-    echo "Stopping port-forwards..."
+    echo "Stopping port-forwards and MLflow server..."
     for pid in $PF_JENKINS $PF_MLFLOW $PF_PROMETHEUS $PF_GRAFANA $PF_API; do
         if [ ! -z "$pid" ]; then
             kill $pid 2>/dev/null || true
         fi
     done
-    echo "Port-forwards stopped"
+    echo "Port-forwards and MLflow server stopped"
 }
 trap cleanup EXIT
 
